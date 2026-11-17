@@ -1,0 +1,112 @@
+[
+  {
+    "id": 1,
+    "category": "Conversational filler removal",
+    "original_prompt": "Hi there, could you please basically kindly read my latest emails, thanks so much!",
+    "optimized_prompt": "Read my latest emails",
+    "original_tokens": 17,
+    "optimized_tokens": 4,
+    "compression_percentage": 76.47,
+    "survived": true,
+    "missing_terms": []
+  },
+  {
+    "id": 2,
+    "category": "Negation preservation",
+    "original_prompt": "Could you please do not transfer money and never send this email to anyone?",
+    "optimized_prompt": "Do not transfer money and never send this email to anyone?",
+    "original_tokens": 15,
+    "optimized_tokens": 12,
+    "compression_percentage": 20.0,
+    "survived": true,
+    "missing_terms": []
+  },
+  {
+    "id": 3,
+    "category": "Financial amount preservation",
+    "original_prompt": "Can you pay the pending invoice for $12,450.00 USD at your earliest convenience?",
+    "optimized_prompt": "Pay the pending invoice for $12,450.00 USD at your earliest convenience?",
+    "original_tokens": 19,
+    "optimized_tokens": 17,
+    "compression_percentage": 10.53,
+    "survived": true,
+    "missing_terms": []
+  },
+  {
+    "id": 4,
+    "category": "Email address preservation",
+    "original_prompt": "I would really appreciate if you could forward the quarterly report to finance-team@securecorp.org please.",
+    "optimized_prompt": "I would appreciate if you could forward the quarterly report to finance-team@securecorp.org.",
+    "original_tokens": 20,
+    "optimized_tokens": 18,
+    "compression_percentage": 10.0,
+    "survived": true,
+    "missing_terms": []
+  },
+  {
+    "id": 5,
+    "category": "Date and deadline preservation",
+    "original_prompt": "Please make sure to submit the audit files before Friday at 4:30 pm or by October 31, 2026.",
+    "optimized_prompt": "Make sure to submit the audit files before Friday at 4:30 pm or by October 31, 2026.",
+    "original_tokens": 26,
+    "optimized_tokens": 25,
+    "compression_percentage": 3.85,
+    "survived": true,
+    "missing_terms": []
+  },
+  {
+    "id": 6,
+    "category": "Tool permission preservation",
+    "original_prompt": "Kindly note you are restricted to read_file only, and must not call execute_command or post_slack.",
+    "optimized_prompt": "Note you are restricted to read_file only, and must not call execute_command or post_slack.",
+    "original_tokens": 22,
+    "optimized_tokens": 20,
+    "compression_percentage": 9.09,
+    "survived": true,
+    "missing_terms": []
+  },
+  {
+    "id": 7,
+    "category": "Conditional instruction preservation",
+    "original_prompt": "Could you search the archives, but do not delete any files unless approved by the compliance officer?",
+    "optimized_prompt": "Search the archives, but do not delete any files unless approved by the compliance officer?",
+    "original_tokens": 19,
+    "optimized_tokens": 17,
+    "compression_percentage": 10.53,
+    "survived": true,
+    "missing_terms": []
+  },
+  {
+    "id": 8,
+    "category": "Multi-clause prompt compression",
+    "original_prompt": "Hi, could you please fetch the logs, and then analyze the error rates, and then summarize the findings?",
+    "optimized_prompt": "Fetch the logs, and then analyze the error rates, and then summarize the findings?",
+    "original_tokens": 22,
+    "optimized_tokens": 17,
+    "compression_percentage": 22.73,
+    "survived": true,
+    "missing_terms": []
+  },
+  {
+    "id": 9,
+    "category": "Empty context handling",
+    "original_prompt": "Can you fetch me the details and reviews of the Dell laptop with product ID B08KFQ9HK5 from Amazon?",
+    "optimized_prompt": "Fetch me the details and reviews of the Dell laptop with product ID B08KFQ9HK5 from Amazon?",
+    "original_tokens": 25,
+    "optimized_tokens": 23,
+    "compression_percentage": 8.0,
+    "survived": true,
+    "missing_terms": []
+  },
+  {
+    "id": 10,
+    "category": "Original intent preservation",
+    "original_prompt": "Please summarize the financial statements without disclosing any proprietary algorithms or passwords.",
+    "optimized_prompt": "Please summarize the financial statements without disclosing any proprietary algorithms or passwords.",
+    "original_tokens": 13,
+    "optimized_tokens": 13,
+    "compression_percentage": 0.0,
+    "survived": true,
+    "missing_terms": []
+  }
+]

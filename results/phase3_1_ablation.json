@@ -1,0 +1,115 @@
+{
+  "evaluation_date": "2026-11-12T18:22:00+05:30",
+  "audit_phase": "Phase 3.1 — Controlled Ablation Study",
+  "test_dataset": "Benchmark Evaluation Set (CASES, 35 cases: 23 attack, 12 benign)",
+  "embedder": "all-MiniLM-L6-v2",
+  "tau": 0.55,
+  "configurations_evaluated": 8,
+  "rows": [
+    {
+      "mode": "B0",
+      "label": "No defense (Baseline)",
+      "asr": 0.913,
+      "attack_detection_recall": 0.0,
+      "unauthorized_execution_rate": 0.913,
+      "benign_tcr": 0.8333,
+      "fp_quarantine_rate": 0.0,
+      "fp_task_blocking_rate": 0.1667,
+      "r_tok": 0.0,
+      "median_check_ms": 0.001,
+      "analysis": "No security layer: injected directives execute directly in the data plane."
+    },
+    {
+      "mode": "B1",
+      "label": "Spotlighting (Datamarking Baseline)",
+      "asr": 0.913,
+      "attack_detection_recall": 0.0,
+      "unauthorized_execution_rate": 0.913,
+      "benign_tcr": 0.8333,
+      "fp_quarantine_rate": 0.0,
+      "fp_task_blocking_rate": 0.1667,
+      "r_tok": 0.0,
+      "median_check_ms": 0.001,
+      "analysis": "Prompt-level marking alone fails when agent compliance is zero or adversarial."
+    },
+    {
+      "mode": "G-A",
+      "label": "Gateway Stage A Only (Cryptographic Provenance)",
+      "asr": 0.6957,
+      "attack_detection_recall": 0.2174,
+      "unauthorized_execution_rate": 0.6957,
+      "benign_tcr": 0.8333,
+      "fp_quarantine_rate": 0.0,
+      "fp_task_blocking_rate": 0.1667,
+      "r_tok": 0.0,
+      "median_check_ms": 0.124,
+      "analysis": "Blocks forged, expired, and tampered tokens; blind to payload injection."
+    },
+    {
+      "mode": "G-B",
+      "label": "Gateway Stage B Only (Semantic Alignment)",
+      "asr": 0.087,
+      "attack_detection_recall": 0.913,
+      "unauthorized_execution_rate": 0.087,
+      "benign_tcr": 0.8333,
+      "fp_quarantine_rate": 0.1667,
+      "fp_task_blocking_rate": 0.1667,
+      "r_tok": 0.0,
+      "median_check_ms": 0.068,
+      "analysis": "Quarantines payload injections; cannot detect rogue tokens with legitimate payload."
+    },
+    {
+      "mode": "G-AB",
+      "label": "Gateway Dual-Plane (Stage A + Stage B)",
+      "asr": 0.0435,
+      "attack_detection_recall": 0.9565,
+      "unauthorized_execution_rate": 0.0435,
+      "benign_tcr": 0.8333,
+      "fp_quarantine_rate": 0.1667,
+      "fp_task_blocking_rate": 0.1667,
+      "r_tok": 0.0,
+      "median_check_ms": 0.16,
+      "analysis": "Simultaneous cryptographic provenance and semantic payload verification."
+    },
+    {
+      "mode": "G-AB+S",
+      "label": "Dual-Plane + Strict Scope Bounds",
+      "asr": 0.0,
+      "attack_detection_recall": 1.0,
+      "unauthorized_execution_rate": 0.0,
+      "benign_tcr": 0.8333,
+      "fp_quarantine_rate": 0.1667,
+      "fp_task_blocking_rate": 0.1667,
+      "r_tok": 0.0,
+      "median_check_ms": 0.16,
+      "analysis": "Zero-trust scope enforcement eliminates residual unauthorized tool attempts."
+    },
+    {
+      "mode": "G-AB+T",
+      "label": "Dual-Plane + Token Optimization",
+      "asr": 0.0435,
+      "attack_detection_recall": 0.9565,
+      "unauthorized_execution_rate": 0.0435,
+      "benign_tcr": 0.8333,
+      "fp_quarantine_rate": 0.1667,
+      "fp_task_blocking_rate": 0.1667,
+      "r_tok": 0.2794,
+      "median_check_ms": 0.169,
+      "analysis": "Achieves 27.94% token reduction while retaining dual-plane security properties."
+    },
+    {
+      "mode": "FULL",
+      "label": "Complete DPVG (Stage A + Stage B + Scope + Token Optimization)",
+      "asr": 0.0,
+      "attack_detection_recall": 1.0,
+      "unauthorized_execution_rate": 0.0,
+      "benign_tcr": 0.8333,
+      "fp_quarantine_rate": 0.1667,
+      "fp_task_blocking_rate": 0.1667,
+      "r_tok": 0.2794,
+      "median_check_ms": 0.148,
+      "analysis": "Complete zero-trust runtime gateway: 100% attack mitigation, 0% unauthorized execution, 27.94% token savings."
+    }
+  ]
+}
+

@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 360" width="700" height="360" style="background:#ffffff; font-family:sans-serif;">
+<text x="350" y="28" text-anchor="middle" font-size="16" font-weight="bold" fill="#111827">Stage B Candidate Score Distributions (Validation Split)</text>
+<rect x="50" y="50" width="600" height="260" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="50" y1="310.0" x2="650" y2="310.0" stroke="#e5e7eb" stroke-dasharray="3,3"/>
+<text x="42" y="314.0" text-anchor="end" font-size="10" fill="#6b7280">0</text>
+<line x1="50" y1="245.0" x2="650" y2="245.0" stroke="#e5e7eb" stroke-dasharray="3,3"/>
+<text x="42" y="249.0" text-anchor="end" font-size="10" fill="#6b7280">23</text>
+<line x1="50" y1="180.0" x2="650" y2="180.0" stroke="#e5e7eb" stroke-dasharray="3,3"/>
+<text x="42" y="184.0" text-anchor="end" font-size="10" fill="#6b7280">47</text>
+<line x1="50" y1="115.0" x2="650" y2="115.0" stroke="#e5e7eb" stroke-dasharray="3,3"/>
+<text x="42" y="119.0" text-anchor="end" font-size="10" fill="#6b7280">71</text>
+<line x1="50" y1="50.0" x2="650" y2="50.0" stroke="#e5e7eb" stroke-dasharray="3,3"/>
+<text x="42" y="54.0" text-anchor="end" font-size="10" fill="#6b7280">95</text>
+<rect x="52.0" y="310.0" width="10.08" height="0.0" fill="#3b82f6" opacity="0.8"/>
+<rect x="62.08" y="310.0" width="10.08" height="0.0" fill="#ef4444" opacity="0.8"/>
+<text x="50.0" y="326" text-anchor="middle" font-size="10" fill="#6b7280">-0.2</text>
+<rect x="76.0" y="310.0" width="10.08" height="0.0" fill="#3b82f6" opacity="0.8"/>
+<rect x="86.08" y="307.2631578947368" width="10.08" height="2.736842105263158" fill="#ef4444" opacity="0.8"/>
+<rect x="100.0" y="310.0" width="10.08" height="0.0" fill="#3b82f6" opacity="0.8"/>
+<rect x="110.08" y="307.2631578947368" width="10.08" height="2.736842105263158" fill="#ef4444" opacity="0.8"/>
+<rect x="124.0" y="310.0" width="10.08" height="0.0" fill="#3b82f6" opacity="0.8"/>
+<rect x="134.08" y="252.5263157894737" width="10.08" height="57.473684210526315" fill="#ef4444" opacity="0.8"/>
+<rect x="148.0" y="310.0" width="10.08" height="0.0" fill="#3b82f6" opacity="0.8"/>
+<rect x="158.08" y="173.1578947368421" width="10.08" height="136.8421052631579" fill="#ef4444" opacity="0.8"/>
+<rect x="172.0" y="299.05263157894734" width="10.08" height="10.947368421052632" fill="#3b82f6" opacity="0.8"/>
+<rect x="182.08" y="80.10526315789474" width="10.08" height="229.89473684210526" fill="#ef4444" opacity="0.8"/>
+<text x="170.0" y="326" text-anchor="middle" font-size="10" fill="#6b7280">+0.0</text>
+<rect x="196.0" y="219.68421052631578" width="10.08" height="90.31578947368422" fill="#3b82f6" opacity="0.8"/>
+<rect x="206.08" y="71.89473684210526" width="10.08" height="238.10526315789474" fill="#ef4444" opacity="0.8"/>
+<rect x="220.0" y="162.21052631578948" width="10.08" height="147.78947368421052" fill="#3b82f6" opacity="0.8"/>
+<rect x="230.08" y="50.0" width="10.08" height="260.0" fill="#ef4444" opacity="0.8"/>
+<rect x="244.0" y="206.0" width="10.08" height="104.0" fill="#3b82f6" opacity="0.8"/>
+<rect x="254.08" y="110.21052631578948" width="10.08" height="199.78947368421052" fill="#ef4444" opacity="0.8"/>
+<rect x="268.0" y="203.26315789473682" width="10.08" height="106.73684210526316" fill="#3b82f6" opacity="0.8"/>
+<rect x="278.08" y="156.73684210526318" width="10.08" height="153.26315789473682" fill="#ef4444" opacity="0.8"/>
+<rect x="292.0" y="189.57894736842104" width="10.08" height="120.42105263157895" fill="#3b82f6" opacity="0.8"/>
+<rect x="302.08" y="222.42105263157896" width="10.08" height="87.57894736842105" fill="#ef4444" opacity="0.8"/>
+<text x="290.0" y="326" text-anchor="middle" font-size="10" fill="#6b7280">+0.2</text>
+<rect x="316.0" y="247.05263157894737" width="10.08" height="62.94736842105263" fill="#3b82f6" opacity="0.8"/>
+<rect x="326.08" y="255.26315789473685" width="10.08" height="54.73684210526316" fill="#ef4444" opacity="0.8"/>
+<rect x="340.0" y="285.36842105263156" width="10.08" height="24.63157894736842" fill="#3b82f6" opacity="0.8"/>
+<rect x="350.08" y="277.1578947368421" width="10.08" height="32.8421052631579" fill="#ef4444" opacity="0.8"/>
+<rect x="364.0" y="310.0" width="10.08" height="0.0" fill="#3b82f6" opacity="0.8"/>
+<rect x="374.08" y="296.3157894736842" width="10.08" height="13.68421052631579" fill="#ef4444" opacity="0.8"/>
+<rect x="388.0" y="293.57894736842104" width="10.08" height="16.42105263157895" fill="#3b82f6" opacity="0.8"/>
+<rect x="398.08" y="299.05263157894734" width="10.08" height="10.947368421052632" fill="#ef4444" opacity="0.8"/>
+<rect x="412.0" y="310.0" width="10.08" height="0.0" fill="#3b82f6" opacity="0.8"/>
+<rect x="422.08" y="304.5263157894737" width="10.08" height="5.473684210526316" fill="#ef4444" opacity="0.8"/>
+<text x="410.0" y="326" text-anchor="middle" font-size="10" fill="#6b7280">+0.4</text>
+<rect x="436.0" y="288.10526315789474" width="10.08" height="21.894736842105264" fill="#3b82f6" opacity="0.8"/>
+<rect x="446.08" y="310.0" width="10.08" height="0.0" fill="#ef4444" opacity="0.8"/>
+<rect x="460.0" y="296.3157894736842" width="10.08" height="13.68421052631579" fill="#3b82f6" opacity="0.8"/>
+<rect x="470.08" y="310.0" width="10.08" height="0.0" fill="#ef4444" opacity="0.8"/>
+<rect x="484.0" y="310.0" width="10.08" height="0.0" fill="#3b82f6" opacity="0.8"/>
+<rect x="494.08" y="310.0" width="10.08" height="0.0" fill="#ef4444" opacity="0.8"/>
+<rect x="508.0" y="310.0" width="10.08" height="0.0" fill="#3b82f6" opacity="0.8"/>
+<rect x="518.08" y="310.0" width="10.08" height="0.0" fill="#ef4444" opacity="0.8"/>
+<rect x="532.0" y="310.0" width="10.08" height="0.0" fill="#3b82f6" opacity="0.8"/>
+<rect x="542.08" y="307.2631578947368" width="10.08" height="2.736842105263158" fill="#ef4444" opacity="0.8"/>
+<text x="530.0" y="326" text-anchor="middle" font-size="10" fill="#6b7280">+0.6</text>
+<rect x="556.0" y="310.0" width="10.08" height="0.0" fill="#3b82f6" opacity="0.8"/>
+<rect x="566.08" y="310.0" width="10.08" height="0.0" fill="#ef4444" opacity="0.8"/>
+<rect x="580.0" y="310.0" width="10.08" height="0.0" fill="#3b82f6" opacity="0.8"/>
+<rect x="590.08" y="310.0" width="10.08" height="0.0" fill="#ef4444" opacity="0.8"/>
+<rect x="604.0" y="310.0" width="10.08" height="0.0" fill="#3b82f6" opacity="0.8"/>
+<rect x="614.08" y="310.0" width="10.08" height="0.0" fill="#ef4444" opacity="0.8"/>
+<rect x="628.0" y="310.0" width="10.08" height="0.0" fill="#3b82f6" opacity="0.8"/>
+<rect x="638.08" y="310.0" width="10.08" height="0.0" fill="#ef4444" opacity="0.8"/>
+<line x1="248.0" y1="50" x2="248.0" y2="310" stroke="#10b981" stroke-width="2.5" stroke-dasharray="4,4"/>
+<text x="253.0" y="70" font-size="12" font-weight="bold" fill="#047857">tau = 0.13</text>
+<rect x="430" y="38" width="12" height="12" fill="#3b82f6"/>
+<text x="448" y="48" font-size="11" fill="#374151">Benign Candidates (N=263)</text>
+<rect x="430" y="56" width="12" height="12" fill="#ef4444"/>
+<text x="448" y="66" font-size="11" fill="#374151">Injected Candidates (N=544)</text>
+</svg>

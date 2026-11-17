@@ -1,0 +1,2 @@
+# Only for the AgentDojo benchmark (python scripts/evaluate.py agentdojo)
+agentdojo>=0.1.35

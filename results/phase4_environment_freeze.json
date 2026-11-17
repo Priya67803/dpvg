@@ -1,0 +1,51 @@
+{
+  "python_version": "3.11.7 (tags/v3.11.7:fa7a6f2, Dec  4 2023, 19:24:49) [MSC v.1937 64 bit (AMD64)]",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "machine": "AMD64",
+  "git_available": false,
+  "git_note": "Workspace extracted from release archive; no .git metadata directory present.",
+  "ollama_model": {
+    "name": "llama3.2:latest",
+    "id": "a80c4f17acd5",
+    "parameters": "3.2B",
+    "quantization": "Q4_K_M",
+    "context_length": 131072,
+    "embedding_length": 3072
+  },
+  "embedder": {
+    "name": "all-MiniLM-L6-v2",
+    "backend": "onnxruntime",
+    "dimensions": 384,
+    "tau_calibrated": 0.55,
+    "tau_paper_default": 0.45,
+    "model_onnx_sha256": "759c3cd2b7fe7e93933ad23c4c9181b7396442a2ed746ec7c1d46192c469c46e",
+    "tokenizer_json_sha256": "da0e79933b9ed51798a3ae27893d3c5fa4a201126cef75586296df9b4d2c62a0"
+  },
+  "core_source_hashes": {
+    "__init__.py": "d6b9d50c68e3669b5a1ed6605bdafa0187bd29e90ef0d0f80ca66880a11bed17",
+    "agents.py": "c35eccc370ba53aebe3e07db0c6dc8dfe891bb4ab0ef8eb84b7f1795ce8aa2d6",
+    "alignment.py": "75a38d90323bcdc27efd997825342fd16542f3aca0910a656c0cb92c913a9bee",
+    "benchmarks.py": "f528864e2ad173475058de02eeca7cb0362fb328c3488d9d8e32d4efe85e4f21",
+    "config.py": "2e17bbacd1d5b1bbb1aa18ec0e072697c80964c75a05e92b245c3a920d334f1d",
+    "dataplane.py": "5bdd727fe16970bc71093dad491ab57f441778b0ac708ac13a81825e5549dbbb",
+    "dataset.py": "7165416727e1c5a5bdb1092b10989307ab2ec88c9ab3e8f45ecb0b651b5416c5",
+    "embeddings.py": "06f2ff2dc293a805be69b2b6abeaef760e68165cefe7481a4755e294bb9d7172",
+    "evaluation.py": "64b6b0d50da636f9342bab879e8664e3c4687915b2a51539b29ab29d1f0da96f",
+    "gateway.py": "ded8432e5555be07997f1ecb10bd98b55d6fb7d9a22d73a51dc02f65bab86ed5",
+    "llm_backends.py": "1df936ee40ae4d2a52364bfcc7622af52291749172cd868cc49666c030fb5676",
+    "main.py": "727086d53575232f5a0045fb50a2200bd60de390165f1c41d80746922d3ae5f4",
+    "orchestrator.py": "491d43583d9ee12280a620159e4a74c013ab957f377208740d10158b71ce5293",
+    "registry.py": "3c020371932a7f79dd0e88066bb7374cb3946157dbd2f7982db5944cf048aacb",
+    "spotlight.py": "8701aa89285ad3fa0c34c9bd5e709ca9e56105c2ad892f70a2199077d26c5a7d",
+    "spt.py": "f658c58805bd9e31a605561487ccd6d505f6b4b636fce7fbab08e70289b24253",
+    "token_opt.py": "f70063badd53745d124fbbeca7527fc4bb35bf8149cfe37be92604acd4f9fc2e",
+    "validator.py": "b9440e1312982ca094b9a0c8dff58b331d080e58aba994d77f0b17cd35772f1b"
+  },
+  "config_defaults": {
+    "SPT_TTL": 300,
+    "MAX_DEPTH": 6,
+    "ISSUER": "dpvg-control-plane",
+    "EXECUTOR": "langgraph",
+    "LLM_TIMEOUT": 120.0
+  }
+}

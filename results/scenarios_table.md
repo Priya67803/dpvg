@@ -1,0 +1,8 @@
+# DPVG Scenario Breakdown Table
+
+## Fine-Grained Attack Scenario Analysis (Mean ± Std over Seeds)
+
+| Workload | Backend | Scenario | Mode | N | ASR | Detection Rate | TCR |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| demo | vulnerable | benign | B0 | 2 | - | 0.0 ± 0.0% (FPR) | 100.0 ± 0.0% |
+| demo | vulnerable | benign | FULL | 2 | - | 0.0 ± 0.0% (FPR) | 100.0 ± 0.0% |

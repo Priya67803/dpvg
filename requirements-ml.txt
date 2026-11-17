@@ -1,0 +1,4 @@
+# Optional: sentence-transformers path (DPVG_EMBEDDER=st) and exact tiktoken counts
+sentence-transformers>=3.0.0
+torch>=2.0.0
+tiktoken>=0.7.0

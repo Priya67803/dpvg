@@ -1,0 +1,66 @@
+{
+  "description": "DPVG Phase 2 Comprehensive Token Optimization Evaluation",
+  "tokenizer": "tiktoken (cl100k_base)",
+  "embedder": "all-MiniLM-L6-v2",
+  "date": "2026-11-12 16:17:08",
+  "datasets": {
+    "injecagent_all": {
+      "n_cases": 3162,
+      "original_tokens": 58404,
+      "optimized_tokens": 54870,
+      "tokens_saved": 3534,
+      "compression_percentage": 6.05,
+      "opt_latency_p50_ms": 0.138,
+      "opt_latency_p95_ms": 0.223
+    },
+    "prototype_all": {
+      "n_cases": 35,
+      "original_tokens": 4229,
+      "optimized_tokens": 3013,
+      "tokens_saved": 1216,
+      "compression_percentage": 28.75
+    }
+  },
+  "mode_comparison_table": [
+    {
+      "mode": "B0",
+      "label": "No defense",
+      "original_tokens": 58404,
+      "optimized_tokens": 58404,
+      "compression": "0.0%",
+      "asr": 0.0,
+      "tcr": 1.0,
+      "fpr": 0.0
+    },
+    {
+      "mode": "G-AB",
+      "label": "Gateway, both stages",
+      "original_tokens": 58404,
+      "optimized_tokens": 58404,
+      "compression": "0.0%",
+      "asr": 0.0,
+      "tcr": 0.8333,
+      "fpr": 0.1667
+    },
+    {
+      "mode": "G-AB+T",
+      "label": "Both stages + token optimization",
+      "original_tokens": 58404,
+      "optimized_tokens": 54870,
+      "compression": "6.1%",
+      "asr": 0.0,
+      "tcr": 0.8333,
+      "fpr": 0.1667
+    },
+    {
+      "mode": "FULL",
+      "label": "Both stages + scope + token optimization",
+      "original_tokens": 58404,
+      "optimized_tokens": 54870,
+      "compression": "6.1%",
+      "asr": 0.0,
+      "tcr": 0.8333,
+      "fpr": 0.1667
+    }
+  ]
+}
