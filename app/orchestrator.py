@@ -74,6 +74,60 @@ class RulePlanner:
             out.append(SubTask(i, t, tool, args))
         return out
 
+    def extend_plan(self, trusted_query: str, proposed_tool: str, tool_catalog: dict | list | None = None) -> dict:
+        catalog = tool_catalog if tool_catalog is not None else self.tool_catalog
+        allowed = set(catalog.keys()) if isinstance(catalog, dict) else (set(catalog) if catalog is not None else None)
+
+        self.call_history.append({
+            "action": "extend_plan",
+            "trusted_query": trusted_query,
+            "proposed_tool": proposed_tool,
+            "tool_catalog": catalog,
+            "timestamp": time.time(),
+        })
+
+        if allowed is not None and proposed_tool not in allowed:
+            return {"approved": False, "reason": f"Tool '{proposed_tool}' is not in catalog", "cited_request_part": None}
+
+        from .dataplane import is_read_only, is_side_effect
+        if is_read_only(proposed_tool):
+            q_lower = str(trusted_query).lower()
+            if proposed_tool == "search_web":
+                if re.search(r"\b(verify|verification|check|crosscheck|cross-check|citation|source|reference|search|look\s*up|find|confirm|report|policy|article|news|online|index)\b", q_lower):
+                    return {"approved": True, "reason": "Read-only tool approved for verification/lookup requested by user", "cited_request_part": None}
+            elif proposed_tool in ("read_file", "read_email", "get_calendar"):
+                if re.search(r"\b(read|file|doc|report|notes|pdf|email|mail|inbox|calendar|meeting|schedule|event)\b", q_lower):
+                    return {"approved": True, "reason": f"Read-only tool '{proposed_tool}' approved to support user task", "cited_request_part": None}
+            if re.search(r"\b(verify|check|find|get|show|read|search|inspect)\b", q_lower):
+                return {"approved": True, "reason": f"Read-only tool '{proposed_tool}' approved for user request", "cited_request_part": None}
+            return {"approved": False, "reason": f"Read-only tool '{proposed_tool}' not related to user request", "cited_request_part": None}
+
+        if is_side_effect(proposed_tool):
+            q_str = str(trusted_query)
+            if proposed_tool == "send_email":
+                m = re.search(r"\b(?:email|mail|send(?:\s+the\s+[\w\s]+)?\s+to|forward(?:\s+to)?|notify)\b[^\n.,;]*", q_str, re.I)
+                if m:
+                    cite = m.group(0).strip()
+                    return {"approved": True, "reason": f"Side-effect tool authorized by: {cite}", "cited_request_part": cite}
+            elif proposed_tool == "transfer_money":
+                m = re.search(r"\b(?:transfer|pay|wire|remit|deposit|withdraw)\b[^\n.,;]*", q_str, re.I)
+                if m:
+                    cite = m.group(0).strip()
+                    return {"approved": True, "reason": f"Side-effect tool authorized by: {cite}", "cited_request_part": cite}
+            elif proposed_tool == "delete_file":
+                m = re.search(r"\b(?:delete|remove|erase|wipe|clean)\b[^\n.,;]*", q_str, re.I)
+                if m:
+                    cite = m.group(0).strip()
+                    return {"approved": True, "reason": f"Side-effect tool authorized by: {cite}", "cited_request_part": cite}
+            elif proposed_tool == "post_slack":
+                m = re.search(r"\b(?:post|slack|channel|message)\b[^\n.,;]*", q_str, re.I)
+                if m:
+                    cite = m.group(0).strip()
+                    return {"approved": True, "reason": f"Side-effect tool authorized by: {cite}", "cited_request_part": cite}
+            return {"approved": False, "reason": f"User request does not authorize side-effect tool '{proposed_tool}'", "cited_request_part": None}
+
+        return {"approved": False, "reason": f"Unknown tool '{proposed_tool}'", "cited_request_part": None}
+
 
 class LLMPlanner:
     def __init__(self, llm: LLMBackend | None = None, tool_catalog: dict | list | None = None, fallback_to_rule: bool = True) -> None:
@@ -149,6 +203,71 @@ class LLMPlanner:
                 return RulePlanner(tool_catalog=catalog).plan(subtask_texts if isinstance(query, list) else user_query, tool_catalog=catalog)
             raise
 
+    def extend_plan(self, trusted_query: str, proposed_tool: str, tool_catalog: dict | list | None = None) -> dict:
+        catalog = tool_catalog if tool_catalog is not None else self.tool_catalog
+        if catalog is None:
+            from .llm_backends import TOOL_SPECS
+            catalog = TOOL_SPECS
+        allowed_tools = set(catalog.keys()) if isinstance(catalog, dict) else set(catalog)
+
+        self.call_history.append({
+            "action": "extend_plan",
+            "trusted_query": trusted_query,
+            "proposed_tool": proposed_tool,
+            "tool_catalog": catalog,
+            "timestamp": time.time(),
+        })
+
+        if proposed_tool not in allowed_tools:
+            return {"approved": False, "reason": f"Tool '{proposed_tool}' is not in catalog", "cited_request_part": None}
+
+        prompt = (
+            f"You are the plan extension reviewer for an autonomous agent.\n"
+            f"The user's original request was:\n\"{trusted_query}\"\n\n"
+            f"Available tools: {sorted(allowed_tools)}\n\n"
+            f"During execution, the agent requested permission to use an unplanned tool: '{proposed_tool}'.\n"
+            f"Determine if this tool is necessary and authorized to satisfy the user's original request.\n"
+            f"Rules:\n"
+            f"1. For read-only tools (e.g. search_web, read_file), approve if they reasonably support answering or verifying the user's request.\n"
+            f"2. For side-effect tools (e.g. send_email, transfer_money, delete_file), you MUST only approve if the user's request explicitly requested or authorized that action. You must provide the exact cited part of the user request.\n"
+            f"3. Return strict JSON with keys:\n"
+            f"   'approved': bool,\n"
+            f"   'reason': string,\n"
+            f"   'cited_request_part': string or null\n"
+        )
+        try:
+            if self.llm is None:
+                raise RuntimeError("No LLM backend available for plan extension")
+            if hasattr(self.llm, "extend_plan"):
+                raw = self.llm.extend_plan(trusted_query, proposed_tool, catalog)
+            elif hasattr(self.llm, "plan"):
+                raw = self.llm.plan(prompt, catalog)
+            elif hasattr(self.llm, "generate"):
+                raw = self.llm.generate(prompt)
+            else:
+                raise RuntimeError("LLM backend does not support plan extension")
+
+            if isinstance(raw, dict):
+                parsed = raw
+            else:
+                clean = str(raw).strip()
+                if clean.startswith("```"):
+                    clean = re.sub(r"^```(?:json)?\s*", "", clean)
+                    clean = re.sub(r"\s*```$", "", clean)
+                parsed = json.loads(clean)
+
+            if not isinstance(parsed, dict) or "approved" not in parsed:
+                raise ValueError("Invalid plan extension response format")
+            return {
+                "approved": bool(parsed.get("approved", False)),
+                "reason": str(parsed.get("reason", "")),
+                "cited_request_part": parsed.get("cited_request_part"),
+            }
+        except Exception:
+            if self.fallback_to_rule:
+                return RulePlanner(tool_catalog=catalog).extend_plan(trusted_query, proposed_tool, tool_catalog=catalog)
+            raise
+
 
 class Planner:
     """Unified planner entrypoint: dispatches to LLMPlanner or RulePlanner based on configuration."""
@@ -175,6 +294,9 @@ class Planner:
     def plan(self, query: str | list[str], tool_catalog: dict | list | None = None) -> list[SubTask]:
         return self._impl.plan(query, tool_catalog=tool_catalog)
 
+    def extend_plan(self, trusted_query: str, proposed_tool: str, tool_catalog: dict | list | None = None) -> dict:
+        return self._impl.extend_plan(trusted_query, proposed_tool, tool_catalog=tool_catalog)
+
 
 class DelegationError(Exception):
     pass
@@ -190,7 +312,7 @@ class Orchestrator:
         return AGENTS["specialized"] if st.tool in {"transfer_money", "send_email", "post_slack", "delete_file"} else AGENTS["tool"]
 
     def issue_root(self, session, tools: list[str], agents: list[str] | None = None,
-                   read_only: bool = False, max_depth: int | None = None) -> tuple[str, dict]:
+                   read_only: bool = False, max_depth: int | None = None, ttl: int | None = None) -> tuple[str, dict]:
         from .spt import root_lineage
         lin = root_lineage(session.root_hash)
         effective_depth = max_depth if max_depth is not None else self.max_depth
@@ -198,7 +320,7 @@ class Orchestrator:
         token, claims = self.spt.issue(root_hash=session.root_hash, lineage=lin, tools=tools,
                                        agents=allowed_agents, depth=0,
                                        agent=AGENTS["planner"].id, max_depth=effective_depth,
-                                       session_id=session.id, read_only=read_only)
+                                       session_id=session.id, read_only=read_only, ttl=ttl)
         self.registry.lineage[claims["jti"]] = LineageRecord(
             lineage=lin, parent=None, depth=0, agent=claims["agent"],
             tools=sorted(set(tools)), agents=sorted(set(allowed_agents)),

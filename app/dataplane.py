@@ -9,17 +9,30 @@ DEFAULT_DATA = {
     "read_file": "Q3 revenue grew 12% year over year to $4.2M. Operating margin improved to 18%. Headcount stayed flat.",
     "search_web": "Top results: independent reviews, price comparisons and buyer guides published this month.",
 }
-SIDE_EFFECT_TOOLS = {"send_email", "transfer_money", "delete_file", "post_slack", "external_action"}
-READ_TOOLS = {"read_email", "get_calendar", "read_file", "search_web"}
-ALL_TOOLS = ["read_email", "get_calendar", "read_file", "search_web", "send_email", "transfer_money", "delete_file", "post_slack", "external_action"]
+from .config import READ_ONLY_TOOLS, SIDE_EFFECT_TOOLS, ALL_CATALOG_TOOLS
+
+READ_TOOLS = READ_ONLY_TOOLS
+ALL_TOOLS = ALL_CATALOG_TOOLS
 
 
 def is_side_effect(tool: str) -> bool:
     return tool in SIDE_EFFECT_TOOLS
 
 
+def is_read_only(tool: str) -> bool:
+    return tool in READ_ONLY_TOOLS
+
+
 def is_write_operation(tool: str) -> bool:
     return tool in SIDE_EFFECT_TOOLS
+
+
+def tool_classification(tool: str) -> str:
+    if tool in READ_ONLY_TOOLS:
+        return "read_only"
+    if tool in SIDE_EFFECT_TOOLS:
+        return "side_effect"
+    raise ValueError(f"tool '{tool}' is not classified")
 
 
 @dataclass

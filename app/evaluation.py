@@ -172,6 +172,7 @@ def evaluate_plan_gating_utility(
     for mode_key in modes:
         runs = [(case, gw.run(case, mode_key)) for case in cases]
         benign = [(case, result) for case, result in runs if not case.get("is_attack", False)]
+        attacks = [(case, result) for case, result in runs if case.get("is_attack", False)]
         utility_cases = [
             (case, result) for case, result in benign
             if case.get("required_tools")
@@ -179,10 +180,11 @@ def evaluate_plan_gating_utility(
         utility_successes = 0
         missing_initial = 0
         for case, result in utility_cases:
-            executed = {entry.get("tool") for entry in result.get("ledger", [])}
+            executed = {entry.get("tool") for entry in result.get("ledger", []) if entry.get("event") != "plan_extension"}
             required = set(case["required_tools"])
             utility_successes += required.issubset(executed)
             missing_initial += bool(result["planner_metrics"]["missing_required_tools_initial"])
+        asr = round(sum(result["metrics"]["attack_success"] for _, result in attacks) / len(attacks), 4) if attacks else 0.0
         rows.append({
             "mode": mode_key,
             "benign_cases": len(benign),
@@ -191,6 +193,8 @@ def evaluate_plan_gating_utility(
             "dynamic_utility_cases": len(utility_cases),
             "dynamic_utility_tcr": round(utility_successes / len(utility_cases), 4)
             if utility_cases else 0.0,
+            "attack_cases": len(attacks),
+            "asr": asr,
             "initial_plan_missing_required_tools": missing_initial,
             "plan_extension_approved": sum(
                 decision["approved"]
@@ -201,7 +205,7 @@ def evaluate_plan_gating_utility(
                 {
                     "id": case.get("id"),
                     "required_tools": case.get("required_tools", []),
-                    "executed_tools": sorted({entry.get("tool") for entry in result.get("ledger", [])}),
+                    "executed_tools": sorted({entry.get("tool") for entry in result.get("ledger", []) if entry.get("event") != "plan_extension"}),
                     "missing_from_initial_plan": result["planner_metrics"]["missing_required_tools_initial"],
                     "missing_from_final_plan": result["planner_metrics"]["missing_required_tools_final"],
                     "plan_extension_decisions": result["planner_metrics"]["plan_extension_decisions"],

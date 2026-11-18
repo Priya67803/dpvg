@@ -39,6 +39,12 @@ TAU_ENV = os.getenv("DPVG_TAU")                       # optional global override
 CALIBRATION_FILE = _CALIBRATION_PATH
 PAPER_TAU = 0.45                                      # paper default for MiniLM
 
+# ---- Tool classification
+READ_ONLY_TOOLS: set[str] = {"read_email", "get_calendar", "read_file", "search_web"}
+SIDE_EFFECT_TOOLS: set[str] = {"send_email", "transfer_money", "delete_file", "post_slack", "external_action"}
+ALL_CATALOG_TOOLS: list[str] = ["read_email", "get_calendar", "read_file", "search_web", "send_email", "transfer_money", "delete_file", "post_slack", "external_action"]
+PLAN_EXTENSION_READ_ONLY_TTL: int = int(os.getenv("DPVG_PLAN_EXTENSION_READ_ONLY_TTL", "60"))
+
 # ---- Stage B override patterns (rule-based filter)
 # Regex patterns defining explicit instruction-override framing and system imitation.
 OVERRIDE_PATTERNS: tuple[str, ...] = (

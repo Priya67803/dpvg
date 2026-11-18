@@ -159,7 +159,8 @@ class Gateway:
                  strict_mode: bool | None = None, backend: str | None = None,
                  seed: int | None = None, temperature: float | None = None,
                  planner_type: str | None = None,
-                 role_backends: dict[str, Any] | None = None) -> None:
+                 role_backends: dict[str, Any] | None = None,
+                 human_approval_hook: Callable[[str, str, str | None], bool] | None = None) -> None:
         if max_replans < 0:
             raise ValueError("max_replans cannot be negative")
         if not -1.0 <= drift_threshold <= 1.0:
@@ -173,6 +174,7 @@ class Gateway:
             raise ValueError(f"drift_metric must be 'ema' or 'mean', got '{drift_metric}'")
         self.drift_metric = "mean" if metric in ("mean", "running_mean") else "ema"
         self.strict_mode = config.STRICT_MODE if strict_mode is None else bool(strict_mode)
+        self.human_approval_hook = human_approval_hook
         self.last_state = None
         self.last_audit = []
         self.embedder = embedder or get_embedder()
@@ -513,7 +515,31 @@ class Gateway:
             if run is not None:
                 if dec.get("code") == "unplanned_action" and run.mode.plan_extension:
                     if self._extend_trusted_plan(run, a.tool):
-                        return
+                        dec2 = self._admit(
+                            st, run.prev_token, a.tool, f"act-{uuid.uuid4().hex[:8]}", "agent_action", text=a.source,
+                            is_write=is_write, args=a.args, intent_tools=run.planned,
+                            authorized_text=self._trusted_intent(case, spec),
+                            trusted_allowlist=self._trusted_allowlist(case, spec),
+                        )
+                        if dec2["allowed"]:
+                            if not self._track_action_alignment(run, a.source, a.tool):
+                                return
+                            st.dp.call(a.tool, a.args, run.prev_claims["jti"], malicious=is_malicious(case, a.source, a, run.planned))
+                            self._ev(st, 4, "Sandboxed execution", "warn", f"agent-initiated {a.tool} executed", tool=a.tool, args=a.args)
+                            return
+                        else:
+                            self._ev(st, 5, "Two-stage verification", "blocked", f"extended agent action {a.tool} blocked: {dec2['reason']}", tool=a.tool)
+                            if run.strict_mode:
+                                audit_entry = st.audit[-1] if st.audit else {
+                                    "ts": time.time(), "point": dec2["point"], "stage": dec2["stage"],
+                                    "code": dec2["code"], "reason": dec2["reason"], "score": dec2["score"],
+                                }
+                                raise RuntimeBlockException(
+                                    dec2["reason"], stage=dec2["stage"], code=dec2["code"],
+                                    reason=dec2["reason"], score=dec2["score"], audit_record=audit_entry,
+                                )
+                            run.replan_reason = f"agent action blocked: {dec2['reason']}"
+                            return
                     if run.strict_mode:
                         audit_entry = st.audit[-1] if st.audit else {
                             "ts": time.time(), "point": dec["point"], "stage": dec["stage"],
@@ -527,40 +553,80 @@ class Gateway:
 
     def _extend_trusted_plan(self, r: "_Run", requested_tool: str) -> bool:
         """Revalidate only the original trusted request before extending the planned tool set."""
+        from .dataplane import is_read_only, is_side_effect, tool_classification
+        from .config import PLAN_EXTENSION_READ_ONLY_TTL
+
         query = str(r.case.get("query") or r.case.get("goal") or "")
         catalog = r.spec.get("allowed_tools") or None
-        extension = self.planner.plan(query, tool_catalog=catalog)
-        additions = [task for task in extension if task.tool and task.tool not in r.planned]
-        approved = any(task.tool == requested_tool for task in additions)
+
+        try:
+            classification = tool_classification(requested_tool)
+        except ValueError:
+            classification = "unknown"
+
+        plan_res = self.planner.extend_plan(query, requested_tool, tool_catalog=catalog)
+        approved = bool(plan_res.get("approved", False))
+        reason = str(plan_res.get("reason", ""))
+        cited = plan_res.get("cited_request_part")
+
+        is_read = is_read_only(requested_tool)
+        is_side = is_side_effect(requested_tool)
+
+        if is_side:
+            if approved and not cited:
+                approved = False
+                reason = "Side-effect extension denied: planner failed to cite authorizing request text"
+            if approved and self.human_approval_hook is not None:
+                try:
+                    if not self.human_approval_hook(query, requested_tool, cited):
+                        approved = False
+                        reason = "Side-effect extension denied by human approval callback"
+                except Exception as e:
+                    approved = False
+                    reason = f"Side-effect extension human approval error: {e}"
+
         decision = {
             "requested_tool": requested_tool,
             "approved": approved,
             "planner_input": "original trusted user query only",
-            "added_tools": sorted({task.tool for task in additions if task.tool}),
+            "added_tools": [requested_tool] if approved else [],
+            "reason": reason,
+            "cited_request_part": cited,
+            "classification": classification,
         }
         r.plan_extension_decisions.append(decision)
         self._ev(r.st, 3, "Plan extension", "ok" if approved else "blocked",
                  "trusted planner approved an extension" if approved else
-                 "trusted planner did not add the requested tool",
+                 f"trusted planner did not approve the requested tool: {reason}",
                  **decision)
+
+        # Log extension decision in ledger
+        r.st.dp.ledger.append({
+            "event": "plan_extension",
+            "decision": "approved" if approved else "denied",
+            "tool": requested_tool,
+            "approved": approved,
+            "reason": reason,
+            "cited_request_part": cited,
+            "classification": classification,
+            "malicious": False,
+            "ts": time.time(),
+        })
+
         if not approved:
             return False
 
-        next_idx = max((task.idx for task in r.plan), default=-1) + 1
-        added_tasks = []
-        for task in additions:
-            if task.tool in r.planned:
-                continue
-            task.idx = next_idx
-            next_idx += 1
-            added_tasks.append(task)
-            r.planned.add(task.tool)
-        if not added_tasks:
-            return False
+        if requested_tool in r.planned:
+            return True
 
-        r.plan.extend(added_tasks)
+        next_idx = max((task.idx for task in r.plan), default=-1) + 1
+        new_task = SubTask(next_idx, f"Extended: {requested_tool}", requested_tool, {})
+        r.plan.append(new_task)
+        r.planned.add(requested_tool)
         r.tools = sorted(r.planned)
-        root_token, r.root_claims = r.st.orch.issue_root(r.session, r.tools)
+
+        ttl = PLAN_EXTENSION_READ_ONLY_TTL if is_read else None
+        root_token, r.root_claims = r.st.orch.issue_root(r.session, r.tools, ttl=ttl)
         r.prev_claims, r.prev_token = r.root_claims, root_token
         r.issued.append({
             "agent": r.root_claims["agent"], "depth": 0, "tools": r.tools,

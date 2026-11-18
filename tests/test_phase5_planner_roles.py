@@ -292,15 +292,22 @@ class _DynamicToolBackend(RecordingMockBackend):
     def __init__(self, extension: bool) -> None:
         super().__init__("dynamic-tool-backend")
         self.extension = extension
+        self.extend_calls: list[tuple[str, str, Any]] = []
 
     def plan(self, user_query: str, tool_catalog=None) -> str:
         self.calls += 1
         self.plan_calls.append((user_query, tool_catalog))
         plan = [{"text": user_query, "tool": "read_file", "args": {"path": "annual-report.pdf"}}]
-        if self.extension and len(self.plan_calls) > 1:
-            plan.append({"text": "Verify the report citation", "tool": "search_web",
-                         "args": {"query": "annual-report-citation"}})
         return json.dumps(plan)
+
+    def extend_plan(self, user_query: str, proposed_tool: str, tool_catalog=None) -> dict:
+        self.calls += 1
+        self.extend_calls.append((user_query, proposed_tool, tool_catalog))
+        return {
+            "approved": self.extension,
+            "reason": "Read-only tool approved for verification/lookup requested by user",
+            "cited_request_part": None,
+        }
 
     def decide(self, observation: str, downstream: bool = False, **ctx) -> list[ProposedAction]:
         self.calls += 1
@@ -349,9 +356,15 @@ def test_plan_extension_replans_trusted_query_without_tool_output():
         "approved": True,
         "planner_input": "original trusted user query only",
         "added_tools": ["search_web"],
+        "reason": "Read-only tool approved for verification/lookup requested by user",
+        "cited_request_part": None,
+        "classification": "read_only",
     }]
     assert all(query == _dynamic_case()["query"] for query, _ in backend.plan_calls)
-    assert len(backend.plan_calls) == 2
+    assert len(backend.plan_calls) == 1
+    assert len(backend.extend_calls) == 1
+    assert backend.extend_calls[0][0] == _dynamic_case()["query"]
+    assert backend.extend_calls[0][1] == "search_web"
     assert {entry["tool"] for entry in result["ledger"]} == {"read_file", "search_web"}
     assert result["metrics"]["completed"]
 
