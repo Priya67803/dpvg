@@ -40,7 +40,7 @@ from app.gateway import Gateway, MODES, PAPER_MODES
 
 DEFAULT_MODES = list(PAPER_MODES)
 DEFAULT_BACKENDS = ["vulnerable", "ollama", "hosted"]
-DEFAULT_WORKLOADS = ["demo", "injecagent_base", "injecagent_enhanced", "adaptive", "drift", "agentdojo"]
+DEFAULT_WORKLOADS = ["injecagent_base", "injecagent_enhanced", "adaptive", "drift", "demo"]
 DEFAULT_SEEDS = [17, 29, 43]
 RESULTS_DIR = ROOT / "results"
 RUNS_DIR = RESULTS_DIR / "runs"
@@ -210,32 +210,109 @@ def check_backend_available(backend: str) -> tuple[bool, str]:
     return False, f"Unknown backend '{backend}'"
 
 
-def load_workload_cases(workload: str, limit: int | None = None) -> tuple[list[dict] | None, str | None]:
-    """Load evaluation cases for a workload, or return (None, skip_reason)."""
+def stratified_sample(cases: list[dict], limit: int | None, sample_seed: int = 42) -> list[dict]:
+    """Stratified sampling by attack type and attacker-tool group.
+    Ensures balanced representation of attack types, attacker tool combinations,
+    and proportional attack/benign control representation.
+    """
+    if limit is None or len(cases) <= limit:
+        return cases
+
+    rng = random.Random(sample_seed)
+    attacks = [c for c in cases if c.get("is_attack")]
+    benign = [c for c in cases if not c.get("is_attack")]
+
+    def _stratum_key(c: dict) -> tuple:
+        atk_type = str(c.get("attack_type") or c.get("source_attack_type") or c.get("scenario") or "unspecified")
+        atk_tools = tuple(sorted(str(t) for t in (c.get("attacker_tools") or [])))
+        return (atk_type, atk_tools)
+
+    if not attacks or not benign:
+        strata: dict[tuple, list[dict]] = {}
+        for c in cases:
+            strata.setdefault(_stratum_key(c), []).append(c)
+        for s in strata.values():
+            rng.shuffle(s)
+        sampled = []
+        keys = sorted(strata.keys())
+        idx = 0
+        while len(sampled) < limit and any(strata.values()):
+            k = keys[idx % len(keys)]
+            if strata[k]:
+                sampled.append(strata[k].pop(0))
+            idx += 1
+        orig_order = {id(c): i for i, c in enumerate(cases)}
+        sampled.sort(key=lambda c: orig_order.get(id(c), 0))
+        return sampled
+
+    frac_attack = len(attacks) / len(cases)
+    target_attacks = max(1, min(len(attacks), int(round(limit * frac_attack))))
+    target_benign = min(len(benign), limit - target_attacks)
+
+    atk_strata: dict[tuple, list[dict]] = {}
+    for c in attacks:
+        atk_strata.setdefault(_stratum_key(c), []).append(c)
+    for s in atk_strata.values():
+        rng.shuffle(s)
+
+    sampled_attacks = []
+    atk_keys = sorted(atk_strata.keys())
+    idx = 0
+    while len(sampled_attacks) < target_attacks and any(atk_strata.values()):
+        k = atk_keys[idx % len(atk_keys)]
+        if atk_strata[k]:
+            sampled_attacks.append(atk_strata[k].pop(0))
+        idx += 1
+
+    ben_strata: dict[tuple, list[dict]] = {}
+    for c in benign:
+        ben_strata.setdefault(_stratum_key(c), []).append(c)
+    for s in ben_strata.values():
+        rng.shuffle(s)
+
+    sampled_benign = []
+    ben_keys = sorted(ben_strata.keys())
+    idx = 0
+    while len(sampled_benign) < target_benign and any(ben_strata.values()):
+        k = ben_keys[idx % len(ben_keys)]
+        if ben_strata[k]:
+            sampled_benign.append(ben_strata[k].pop(0))
+        idx += 1
+
+    sampled = sampled_attacks + sampled_benign
+    orig_order = {id(c): i for i, c in enumerate(cases)}
+    sampled.sort(key=lambda c: orig_order.get(id(c), 0))
+    return sampled
+
+
+def load_workload_cases(workload: str, limit: int | None = None, sample_seed: int = 42) -> tuple[list[dict] | None, str | None]:
+    """Load evaluation cases for a workload on the TEST split only, or return (None, skip_reason)."""
     w = workload.lower()
     if w == "demo":
         cases = split_cases("test")
-        if limit is not None:
-            cases = cases[:limit]
+        cases = stratified_sample(cases, limit=limit, sample_seed=sample_seed)
         return cases, None
 
     if w == "injecagent_base":
         try:
-            cases = load_injecagent(setting="base", split="test", limit=limit)
+            cases = load_injecagent(setting="base", split="test", limit=None)
+            cases = stratified_sample(cases, limit=limit, sample_seed=sample_seed)
             return cases, None
         except FileNotFoundError as e:
             return None, f"InjecAgent base dataset missing: {e}"
 
     if w == "injecagent_enhanced":
         try:
-            cases = load_injecagent(setting="enhanced", split="test", limit=limit)
+            cases = load_injecagent(setting="enhanced", split="test", limit=None)
+            cases = stratified_sample(cases, limit=limit, sample_seed=sample_seed)
             return cases, None
         except FileNotFoundError as e:
             return None, f"InjecAgent enhanced dataset missing: {e}"
 
     if w == "adaptive":
         try:
-            cases = load_adaptive_attacks(setting="both", split="test", limit=limit)
+            cases = load_adaptive_attacks(setting="both", split="test", limit=None)
+            cases = stratified_sample(cases, limit=limit, sample_seed=sample_seed)
             return cases, None
         except FileNotFoundError as e:
             return None, f"Adaptive attacks dataset missing: {e}"
@@ -260,8 +337,7 @@ def load_workload_cases(workload: str, limit: int | None = None) -> tuple[list[d
                 "split": scenario["split"],
                 "subtasks": [{"text": str(step), "tool": None, "args": {}} for step in scenario["steps"]],
             })
-        if limit is not None:
-            cases = cases[:limit]
+        cases = stratified_sample(cases, limit=limit, sample_seed=sample_seed)
         if not cases:
             return None, "Drift scenarios have no held-out test cases"
         return cases, None
@@ -419,6 +495,22 @@ def evaluate_single_mode(gateway: Gateway, mode_key: str, cases: list[dict]) -> 
 # 5. Full Matrix Runner
 # ==============================================================================
 
+def _find_cached_run(search_dirs: list[pathlib.Path], backend: str, workload: str, seed: int, required_modes: list[str]) -> dict | None:
+    for d in search_dirs:
+        if not d.exists():
+            continue
+        matches = sorted(d.glob(f"{backend}_{workload}_seed{seed}_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+        for f in matches:
+            try:
+                data = json.loads(f.read_text(encoding="utf-8"))
+                modes_data = data.get("modes", {})
+                if all(m in modes_data for m in required_modes):
+                    return data
+            except Exception:
+                continue
+    return None
+
+
 def run_matrix(
     modes: list[str] = DEFAULT_MODES,
     backends: list[str] = DEFAULT_BACKENDS,
@@ -427,16 +519,42 @@ def run_matrix(
     tau: float | None = None,
     temperature: float = 0.0,
     limit: int | None = None,
+    sample_seed: int = 42,
+    resume: bool = False,
+    yes: bool = False,
     output_path: pathlib.Path | None = None,
     runs_dir: pathlib.Path | None = None,
 ) -> dict:
     """Execute evaluation matrix across configurations, backends, workloads, and seeds."""
     out_dir = runs_dir or RUNS_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
+    search_dirs = [out_dir, RUNS_DIR, RESULTS_DIR / "vulnerable_backend_matrix_2026-11-17" / "runs"]
     git_commit = get_git_commit()
     timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
     embedder = get_embedder()
     effective_tau = default_tau(embedder) if tau is None else tau
+
+    total_runs = len(workloads) * len(backends) * len(seeds)
+    print(f"\n=======================================================")
+    print(f" DPVG Evaluation Matrix Execution Plan")
+    print(f" Workloads ({len(workloads)}): {workloads}")
+    print(f" Backends  ({len(backends)}): {backends}")
+    print(f" Modes     ({len(modes)}): {modes}")
+    print(f" Seeds     ({len(seeds)}): {seeds}")
+    if limit is not None:
+        print(f" Stratified sample limit: {limit} (sample-seed={sample_seed})")
+    print(f" Total seed-level runs: {total_runs} (across {len(modes)} modes = {total_runs * len(modes)} evaluations)")
+    print(f" Resume enabled: {resume}")
+    print(f"=======================================================\n")
+
+    if not yes and sys.stdin and hasattr(sys.stdin, "isatty") and sys.stdin.isatty():
+        try:
+            confirm = input("Proceed with evaluation matrix run? [y/N]: ").strip().lower()
+        except (EOFError, OSError):
+            confirm = "y"
+        if confirm not in ("y", "yes"):
+            print("Aborted by user.")
+            return {}
 
     matrix_results: dict[str, Any] = {
         "provenance": {
@@ -458,13 +576,17 @@ def run_matrix(
             "backends": backends,
             "workloads": workloads,
             "limit": limit,
+            "sample_seed": sample_seed,
         },
         "workloads": {},
         "skipped": {},
     }
 
+    t_matrix_start = time.time()
+    completed_runs = 0
+
     for workload in workloads:
-        cases, skip_reason = load_workload_cases(workload, limit=limit)
+        cases, skip_reason = load_workload_cases(workload, limit=limit, sample_seed=sample_seed)
         if skip_reason is not None:
             matrix_results["skipped"][workload] = {
                 "status": "skipped",
@@ -502,11 +624,29 @@ def run_matrix(
                     "reason": b_reason,
                 }
                 print(f"[-] Workload '{workload}' on backend '{backend}' skipped: {b_reason}")
+                completed_runs += len(seeds)
                 continue
 
-            print(f"[+] Running Workload '{workload}' on '{backend}' across seeds {seeds} (n={len(cases)})...")
             seed_runs = []
             for seed in seeds:
+                if resume:
+                    cached = _find_cached_run(search_dirs, backend, workload, seed, modes)
+                    if cached is not None:
+                        completed_runs += 1
+                        elapsed_total = time.time() - t_matrix_start
+                        eta_total = (elapsed_total / completed_runs * (total_runs - completed_runs)) if completed_runs > 0 else 0.0
+                        print(f"[{completed_runs}/{total_runs} ({(completed_runs/total_runs)*100:.1f}%)] [Resume] Cached run loaded for '{workload}' on '{backend}' seed {seed} | Elapsed: {elapsed_total:.1f}s, ETA: {eta_total:.1f}s")
+                        run_file = out_dir / f"{backend}_{workload}_seed{seed}_{int(time.time())}.json"
+                        if not any(out_dir.glob(f"{backend}_{workload}_seed{seed}_*.json")):
+                            run_file.write_text(json.dumps(cached, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+                        seed_runs.append(cached)
+                        continue
+
+                t_run_start = time.time()
+                elapsed_total = t_run_start - t_matrix_start
+                eta_total = (elapsed_total / completed_runs * (total_runs - completed_runs)) if completed_runs > 0 else 0.0
+                print(f"[{completed_runs+1}/{total_runs} ({(completed_runs/total_runs)*100:.1f}%)] Running '{workload}' on '{backend}' seed {seed} (n={len(cases)})... Elapsed: {elapsed_total:.1f}s, ETA: {eta_total:.1f}s")
+
                 set_random_seed(seed)
                 gw = Gateway(
                     backend=backend,
@@ -554,6 +694,7 @@ def run_matrix(
                 run_file = out_dir / f"{backend}_{workload}_seed{seed}_{int(time.time())}.json"
                 run_file.write_text(json.dumps(run_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
                 seed_runs.append(run_data)
+                completed_runs += 1
 
             # Aggregate across seeds
             mode_summaries = {}
@@ -786,7 +927,7 @@ def generate_summary_tables(data: dict, out_dir: pathlib.Path) -> tuple[pathlib.
 
     # ------------------ Scenarios Breakdown Table ------------------
     sc_headers = [
-        "Workload", "Backend", "Scenario", "Mode", "N", "ASR", "Detection Rate", "TCR",
+        "Workload", "Backend", "Scenario", "Mode", "N", "ASR", "Detection Rate", "TCR", "Token Counter(s)",
     ]
     sc_csv_rows = []
     sc_md_lines = [
@@ -813,6 +954,17 @@ def generate_summary_tables(data: dict, out_dir: pathlib.Path) -> tuple[pathlib.
         "| " + " | ".join(type_headers) + " |",
         "| " + " | ".join(["---"] * len(type_headers)) + " |",
     ]
+    attrib_headers = [
+        "Workload", "Backend", "Attack Type", "Mode", "Total Attacks",
+        "B-rules", "B-sem", "Plan Gating", "Scope", "Argument Check", "Drift", "Stage A", "Executed"
+    ]
+    attrib_csv_rows = []
+    attrib_md_lines = [
+        "# DPVG Per-Layer Attribution Table (Attack Type x Configuration)",
+        "",
+        "| " + " | ".join(attrib_headers) + " |",
+        "| " + " | ".join(["---"] * len(attrib_headers)) + " |",
+    ]
 
     for workload, backends_data in data.get("workloads", {}).items():
         if workload == "agentdojo":
@@ -834,6 +986,28 @@ def generate_summary_tables(data: dict, out_dir: pathlib.Path) -> tuple[pathlib.
                     ]
                     type_csv_rows.append(row)
                     type_md_lines.append("| " + " | ".join(row) + " |")
+
+                    # Per-layer attribution table row
+                    n_type = outcome.get("n", 0)
+                    executed = outcome.get("executed", 0)
+                    stopped = outcome.get("stopped_by_layer", {})
+                    attrib_row = [
+                        workload,
+                        backend,
+                        attack_type,
+                        mode,
+                        str(n_type),
+                        str(stopped.get("B-rules", 0)),
+                        str(stopped.get("B-sem", 0)),
+                        str(stopped.get("plan_gating", 0)),
+                        str(stopped.get("scope", 0)),
+                        str(stopped.get("argument_check", 0)),
+                        str(stopped.get("drift", 0)),
+                        str(stopped.get("stage_a", 0)),
+                        str(executed),
+                    ]
+                    attrib_csv_rows.append(attrib_row)
+                    attrib_md_lines.append("| " + " | ".join(attrib_row) + " |")
             for sc in SCENARIOS_ORDER:
                 for mode, m_data in summary.items():
                     sc_info = m_data.get("scenarios", {}).get(sc)
@@ -849,8 +1023,9 @@ def generate_summary_tables(data: dict, out_dir: pathlib.Path) -> tuple[pathlib.
                         det_str = _fmt_stat(sc_info.get("detected"), pct=True)
                         tcr_str = _fmt_stat(sc_info.get("tcr_attack"), pct=True)
 
+                    token_src = ", ".join(m_data.get("token_sources", [])) or "unavailable"
                     row = [
-                        workload, backend, sc, mode, str(n), asr_str, det_str, tcr_str,
+                        workload, backend, sc, mode, str(n), asr_str, det_str, tcr_str, token_src,
                     ]
                     sc_csv_rows.append(row)
                     sc_md_lines.append("| " + " | ".join(row) + " |")
@@ -865,6 +1040,14 @@ def generate_summary_tables(data: dict, out_dir: pathlib.Path) -> tuple[pathlib.
     md_lines.extend(["", "---", ""] + sc_md_lines[2:])
     md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
 
+    attrib_md_path = out_dir / "layer_attribution_table.md"
+    attrib_csv_path = out_dir / "layer_attribution_table.csv"
+    with open(attrib_csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(attrib_headers)
+        writer.writerows(attrib_csv_rows)
+    attrib_md_path.write_text("\n".join(attrib_md_lines) + "\n", encoding="utf-8")
+
     with open(layer_csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(layer_headers)
@@ -876,7 +1059,7 @@ def generate_summary_tables(data: dict, out_dir: pathlib.Path) -> tuple[pathlib.
         writer.writerows(type_csv_rows)
     type_md_path.write_text("\n".join(type_md_lines) + "\n", encoding="utf-8")
 
-    print(f"[+] Wrote Summary Tables:\n    - {md_path}\n    - {csv_path}\n    - {sc_md_path}\n    - {sc_csv_path}\n    - {layer_md_path}\n    - {layer_csv_path}\n    - {type_md_path}\n    - {type_csv_path}")
+    print(f"[+] Wrote Summary Tables:\n    - {md_path}\n    - {csv_path}\n    - {sc_md_path}\n    - {sc_csv_path}\n    - {layer_md_path}\n    - {layer_csv_path}\n    - {type_md_path}\n    - {type_csv_path}\n    - {attrib_md_path}\n    - {attrib_csv_path}")
     return md_path, csv_path
 
 
@@ -890,7 +1073,7 @@ def main() -> None:
                         help="Gateway modes to evaluate.")
     parser.add_argument("--backends", nargs="+", choices=DEFAULT_BACKENDS, default=DEFAULT_BACKENDS,
                         help="LLM backends to evaluate.")
-    parser.add_argument("--workloads", nargs="+", choices=DEFAULT_WORKLOADS, default=DEFAULT_WORKLOADS,
+    parser.add_argument("--workloads", nargs="+", choices=DEFAULT_WORKLOADS + ["agentdojo"], default=DEFAULT_WORKLOADS,
                         help="Workloads to evaluate.")
     parser.add_argument("--seeds", nargs="+", type=int, default=DEFAULT_SEEDS,
                         help="Random seeds.")
@@ -899,7 +1082,13 @@ def main() -> None:
     parser.add_argument("--temperature", type=float, default=0.0,
                         help="Sampling temperature for LLM.")
     parser.add_argument("--limit", type=int, default=None,
-                        help="Limit number of cases per workload.")
+                        help="Limit number of cases per workload (stratified sampling).")
+    parser.add_argument("--sample-seed", type=int, default=42,
+                        help="Seed for stratified sampling when limit is set.")
+    parser.add_argument("--resume", action="store_true", default=False,
+                        help="Resume matrix evaluation using previously saved run JSONs.")
+    parser.add_argument("--yes", "-y", action="store_true", default=False,
+                        help="Proceed without interactive confirmation.")
     parser.add_argument("--output", type=pathlib.Path, default=RESULTS_DIR / "matrix_evaluation.json",
                         help="Output path for matrix evaluation JSON.")
     parser.add_argument("--runs-dir", type=pathlib.Path, default=RUNS_DIR,
@@ -925,6 +1114,9 @@ def main() -> None:
         tau=args.tau,
         temperature=args.temperature,
         limit=args.limit,
+        sample_seed=args.sample_seed,
+        resume=args.resume,
+        yes=args.yes,
         output_path=args.output,
         runs_dir=args.runs_dir,
     )
