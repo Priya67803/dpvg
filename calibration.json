@@ -2445,6 +2445,23 @@
     ]
   },
   "drift": {
+    "tau_drift": 0.35,
+    "consecutive_steps": 1,
+    "ema_alpha": 0.8,
+    "selection_split": "val",
+    "max_fpr": 0.1,
+    "validation_detection_rate": 1.0,
+    "validation_false_block_rate": 0.0,
+    "heldout_test_detection_rate": 1.0,
+    "heldout_test_false_block_rate": 0.1429,
+    "scenario_count_total": 160,
+    "val_scenarios": 80,
+    "test_scenarios": 80,
+    "source_data": "data\\drift_scenarios.json",
+    "date": "2026-11-18",
+    "status": "calibrated_on_validation_only"
+  },
+  "drift_legacy_11_scenarios": {
     "tau_drift": 0.4,
     "consecutive_steps": 2,
     "ema_alpha": 0.8,
@@ -2452,7 +2469,10 @@
     "max_fpr": 0.1,
     "detection_rate": 1.0,
     "false_block_rate": 0.0,
-    "source_data": "data\\drift_scenarios.json",
-    "date": "2026-11-17"
+    "scenario_count": 11,
+    "source_data": "data/drift_scenarios.json (legacy)",
+    "date": "2026-11-17",
+    "status": "superseded_by_drift_v2",
+    "notes": "Original 11-scenario estimate (6 benign, 5 attack); superseded by 160-scenario validation/test benchmark."
   }
 }

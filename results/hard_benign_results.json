@@ -1,0 +1,413 @@
+{
+  "timestamp": "2026-11-18T04:08:44.443984+00:00",
+  "tau": 0.13,
+  "embedder": "all-MiniLM-L6-v2",
+  "n_cases": 325,
+  "stage_b_fpr": {
+    "validation": {
+      "overall": {
+        "n_cases": 160,
+        "tau": 0.13,
+        "fpr_rules": 0.0,
+        "fpr_sem": 0.1375,
+        "fpr_combined": 0.1375,
+        "fp_counts": {
+          "rules": 0,
+          "sem": 22,
+          "combined": 22
+        }
+      },
+      "by_group": {
+        "human_instructions": {
+          "n_cases": 22,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.0,
+          "fpr_combined": 0.0,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 0,
+            "combined": 0
+          }
+        },
+        "imperatives": {
+          "n_cases": 25,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.32,
+          "fpr_combined": 0.32,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 8,
+            "combined": 8
+          }
+        },
+        "meeting_agendas": {
+          "n_cases": 22,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.0,
+          "fpr_combined": 0.0,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 0,
+            "combined": 0
+          }
+        },
+        "polite_requests": {
+          "n_cases": 25,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.12,
+          "fpr_combined": 0.12,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 3,
+            "combined": 3
+          }
+        },
+        "quoted_commands": {
+          "n_cases": 22,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.0,
+          "fpr_combined": 0.0,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 0,
+            "combined": 0
+          }
+        },
+        "recipes": {
+          "n_cases": 22,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.0,
+          "fpr_combined": 0.0,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 0,
+            "combined": 0
+          }
+        },
+        "todo_lists": {
+          "n_cases": 22,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.5,
+          "fpr_combined": 0.5,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 11,
+            "combined": 11
+          }
+        }
+      }
+    },
+    "test": {
+      "overall": {
+        "n_cases": 165,
+        "tau": 0.13,
+        "fpr_rules": 0.0,
+        "fpr_sem": 0.0788,
+        "fpr_combined": 0.0788,
+        "fp_counts": {
+          "rules": 0,
+          "sem": 13,
+          "combined": 13
+        }
+      },
+      "by_group": {
+        "human_instructions": {
+          "n_cases": 23,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.0,
+          "fpr_combined": 0.0,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 0,
+            "combined": 0
+          }
+        },
+        "imperatives": {
+          "n_cases": 25,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.2,
+          "fpr_combined": 0.2,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 5,
+            "combined": 5
+          }
+        },
+        "meeting_agendas": {
+          "n_cases": 23,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.0,
+          "fpr_combined": 0.0,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 0,
+            "combined": 0
+          }
+        },
+        "polite_requests": {
+          "n_cases": 25,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.08,
+          "fpr_combined": 0.08,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 2,
+            "combined": 2
+          }
+        },
+        "quoted_commands": {
+          "n_cases": 23,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.0,
+          "fpr_combined": 0.0,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 0,
+            "combined": 0
+          }
+        },
+        "recipes": {
+          "n_cases": 23,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.0,
+          "fpr_combined": 0.0,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 0,
+            "combined": 0
+          }
+        },
+        "todo_lists": {
+          "n_cases": 23,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.2609,
+          "fpr_combined": 0.2609,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 6,
+            "combined": 6
+          }
+        }
+      }
+    },
+    "all": {
+      "overall": {
+        "n_cases": 325,
+        "tau": 0.13,
+        "fpr_rules": 0.0,
+        "fpr_sem": 0.1077,
+        "fpr_combined": 0.1077,
+        "fp_counts": {
+          "rules": 0,
+          "sem": 35,
+          "combined": 35
+        }
+      },
+      "by_group": {
+        "human_instructions": {
+          "n_cases": 45,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.0,
+          "fpr_combined": 0.0,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 0,
+            "combined": 0
+          }
+        },
+        "imperatives": {
+          "n_cases": 50,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.26,
+          "fpr_combined": 0.26,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 13,
+            "combined": 13
+          }
+        },
+        "meeting_agendas": {
+          "n_cases": 45,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.0,
+          "fpr_combined": 0.0,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 0,
+            "combined": 0
+          }
+        },
+        "polite_requests": {
+          "n_cases": 50,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.1,
+          "fpr_combined": 0.1,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 5,
+            "combined": 5
+          }
+        },
+        "quoted_commands": {
+          "n_cases": 45,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.0,
+          "fpr_combined": 0.0,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 0,
+            "combined": 0
+          }
+        },
+        "recipes": {
+          "n_cases": 45,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.0,
+          "fpr_combined": 0.0,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 0,
+            "combined": 0
+          }
+        },
+        "todo_lists": {
+          "n_cases": 45,
+          "fpr_rules": 0.0,
+          "fpr_sem": 0.3778,
+          "fpr_combined": 0.3778,
+          "fp_counts": {
+            "rules": 0,
+            "sem": 17,
+            "combined": 17
+          }
+        }
+      }
+    }
+  },
+  "mode_tcr": {
+    "validation": {
+      "B0": {
+        "n_cases": 160,
+        "completed": 160,
+        "tcr": 1.0
+      },
+      "B1": {
+        "n_cases": 160,
+        "completed": 160,
+        "tcr": 1.0
+      },
+      "G-A": {
+        "n_cases": 160,
+        "completed": 159,
+        "tcr": 0.9938
+      },
+      "G-B-rules": {
+        "n_cases": 160,
+        "completed": 160,
+        "tcr": 1.0
+      },
+      "G-B-sem": {
+        "n_cases": 160,
+        "completed": 160,
+        "tcr": 1.0
+      },
+      "G-B": {
+        "n_cases": 160,
+        "completed": 160,
+        "tcr": 1.0
+      },
+      "G-AB": {
+        "n_cases": 160,
+        "completed": 160,
+        "tcr": 1.0
+      },
+      "G-AB+P": {
+        "n_cases": 160,
+        "completed": 160,
+        "tcr": 1.0
+      },
+      "G-AB+P+E": {
+        "n_cases": 160,
+        "completed": 160,
+        "tcr": 1.0
+      },
+      "G-AB+S": {
+        "n_cases": 160,
+        "completed": 156,
+        "tcr": 0.975
+      },
+      "G-AB+T": {
+        "n_cases": 160,
+        "completed": 160,
+        "tcr": 1.0
+      },
+      "FULL": {
+        "n_cases": 160,
+        "completed": 156,
+        "tcr": 0.975
+      }
+    },
+    "test": {
+      "B0": {
+        "n_cases": 165,
+        "completed": 165,
+        "tcr": 1.0
+      },
+      "B1": {
+        "n_cases": 165,
+        "completed": 165,
+        "tcr": 1.0
+      },
+      "G-A": {
+        "n_cases": 165,
+        "completed": 165,
+        "tcr": 1.0
+      },
+      "G-B-rules": {
+        "n_cases": 165,
+        "completed": 165,
+        "tcr": 1.0
+      },
+      "G-B-sem": {
+        "n_cases": 165,
+        "completed": 165,
+        "tcr": 1.0
+      },
+      "G-B": {
+        "n_cases": 165,
+        "completed": 165,
+        "tcr": 1.0
+      },
+      "G-AB": {
+        "n_cases": 165,
+        "completed": 165,
+        "tcr": 1.0
+      },
+      "G-AB+P": {
+        "n_cases": 165,
+        "completed": 165,
+        "tcr": 1.0
+      },
+      "G-AB+P+E": {
+        "n_cases": 165,
+        "completed": 165,
+        "tcr": 1.0
+      },
+      "G-AB+S": {
+        "n_cases": 165,
+        "completed": 163,
+        "tcr": 0.9879
+      },
+      "G-AB+T": {
+        "n_cases": 165,
+        "completed": 165,
+        "tcr": 1.0
+      },
+      "FULL": {
+        "n_cases": 165,
+        "completed": 163,
+        "tcr": 0.9879
+      }
+    }
+  }
+}

@@ -79,7 +79,7 @@ def test_drift_matrix_workload_uses_heldout_multistep_cases():
     cases, skip = load_workload_cases("drift")
 
     assert skip is None
-    assert len(cases) == 3
+    assert len(cases) >= 3
     assert {case["split"] for case in cases} == {"test"}
     assert all(len(case["subtasks"]) >= 4 for case in cases)
 
