@@ -198,6 +198,11 @@ def align(body: dict = Body(...)):
     tau = float(body.get("tau", default_tau(e)))
     sess = VectorRegistry(e).register({"goal": body["intent"]})
     res = AlignmentEngine(e).check_payload(sess.e_root, body["text"], tau)
+    for c in res["candidates"]:
+        if c.get("score") is not None:
+            c["margin"] = round(c["score"] - tau, 4)
+            c["near_threshold"] = abs(c["margin"]) < 0.03
+            c["label"] = "aligned but instruction-like (sanitized)" if c["allowed"] else "Blocked"
     return {**res, "tau": tau, "root_hash": sess.root_hash, "hidden_content": has_hidden_content(body["text"]),
             "sanitized": sanitize(body["text"], [(c["text"], c["allowed"]) for c in res["candidates"]])}
 

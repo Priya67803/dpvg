@@ -31,7 +31,7 @@ async function init() {
   $("#backend").value = backends.default;
   const groups = { benign: "Benign tasks", static: "Static injections", adaptive: "Adaptive and camouflaged", token: "Forged, tampered, expired, replayed tokens", propagation: "Propagation through handoffs" };
   $("#preset").innerHTML = Object.entries(groups).map(([k, label]) =>
-    `<optgroup label="${label}">${CASES.filter((c) => c.scenario === k).map((c) => `<option value="${c.id}">${c.id}: ${esc(c.goal.slice(0, 54))}</option>`).join("")}</optgroup>`).join("");
+    `<optgroup label="${label}">${CASES.filter((c) => c.scenario === k).map((c) => `<option value="${c.id}">${c.id}: ${esc(c.label || c.goal.slice(0, 54))}</option>`).join("")}</optgroup>`).join("");
   $("#mode").innerHTML = MODES.map((m) => `<option value="${m.key}">${m.key}: ${esc(m.label)}</option>`).join("") + `<option value="custom">Custom</option>`;
   $("#mode").value = HEALTH.default_mode || "FULL";
   $("#tau").value = HEALTH.default_tau; $("#alTau").value = HEALTH.default_tau; $("#evTau").value = HEALTH.default_tau;
@@ -192,7 +192,14 @@ $("#alBtn").addEventListener("click", () => busy($("#alBtn"), async () => {
   const r = await api("align", { intent: $("#alIntent").value, text: $("#alText").value, tau: Number($("#alTau").value) });
   $("#alOut").innerHTML = `<h2>${r.candidates.length} candidate action${r.candidates.length === 1 ? "" : "s"} found</h2>
     <p class="hint">Root hash ${esc(r.root_hash.slice(0, 16))}… ${r.hidden_content ? '<span class="tag mid">hidden comment or zero-width text exposed</span>' : ""}</p>` +
-    (r.candidates.map((c) => `<div class="cand ${c.allowed ? "" : "no"}"><b>${c.allowed ? "Aligned" : "Blocked"}</b> · similarity ${c.score.toFixed(3)} vs τ ${r.tau.toFixed(2)}<br>${esc(c.text)}</div>`).join("") || '<p class="hint">No instruction-like text. The payload is plain data.</p>') +
+    (r.candidates.map((c) => {
+      const margin = c.margin != null ? c.margin : (c.score != null ? c.score - r.tau : 0);
+      const isNear = Math.abs(margin) < 0.03;
+      const marginStr = (margin >= 0 ? "+" : "") + margin.toFixed(3);
+      const nearTag = isNear ? ' <span class="tag mid">near threshold</span>' : "";
+      const label = c.allowed ? "aligned but instruction-like (sanitized)" : "Blocked";
+      return `<div class="cand ${c.allowed ? "" : "no"}"><b>${esc(label)}</b>${nearTag} · similarity ${c.score != null ? c.score.toFixed(3) : "-"} vs τ ${r.tau.toFixed(2)} (margin ${marginStr})<br>${esc(c.text)}</div>`;
+    }).join("") || '<p class="hint">No instruction-like text. The payload is plain data.</p>') +
     `<h3>What the agent receives</h3><pre class="small">${esc(r.sanitized)}</pre>`;
 }));
 

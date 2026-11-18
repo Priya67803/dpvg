@@ -710,6 +710,8 @@ class Gateway:
         return backend.decide(
             view, downstream, goal=goal, tool=stk.tool if stk else None,
             args=stk.args if stk else None, spotlight_kind=kind,
+            raw_fixture=(r.case.get("fixtures") or {}).get(stk.tool if stk else "") if r and r.case else None,
+            case=r.case if r else None,
             **({"token_budget": max(1, min(512, token_budget // 4))} if token_budget is not None else {}),
         )
 
