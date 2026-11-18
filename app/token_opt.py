@@ -47,6 +47,15 @@ def count_tokens(text: str) -> int:
     return sum(1 + len(w) // 8 for w in re.findall(r"\w+|[^\w\s]", text))
 
 
+def get_token_counter_source() -> str:
+    """Return the name of the token counting implementation used."""
+    if _ENC is not None:
+        return "tiktoken"
+    if _WORDPIECE_TOK is not None:
+        return "wordpiece"
+    return "approximate"
+
+
 def truncate_to_tokens(text: str, budget: int) -> str:
     """Return a prefix whose measured size does not exceed `budget`."""
     if budget <= 0 or not text:
@@ -104,6 +113,48 @@ _CRITICAL_PATTERNS = [
 ]
 
 
+PROTECTED_CLASSES = {"user_preference", "policy", "constraint", "intent"}
+
+_USER_PREFERENCE_PATTERNS = [
+    re.compile(r"\b(?:the\s+)?user\s+prefers?\b", re.I),
+    re.compile(r"\b(?:user\s+)?preference[s]?\s*:", re.I),
+    re.compile(r"\b(?:language|style|format|tone)\s+preference\b", re.I),
+    re.compile(r"\bprefers?\s+(?:concise|detailed|brief|formal|informal|plain|bullet|markdown|json)\b", re.I),
+    re.compile(r"\bwritten\s+in\s+(?:British|American|Australian|Canadian)?\s*English\b", re.I),
+    re.compile(r"\b(?:always\s+respond\s+in|always\s+write\s+in|always\s+use)\b", re.I),
+]
+
+
+def is_user_preference(text: str | dict) -> bool:
+    """Return True if text or chunk represents a user preference."""
+    if isinstance(text, dict):
+        if text.get("class") == "user_preference" or text.get("type") == "user_preference":
+            return True
+        raw = str(text.get("text") or text.get("content") or "")
+    else:
+        raw = str(text)
+    return any(p.search(raw) for p in _USER_PREFERENCE_PATTERNS)
+
+
+def is_protected_chunk(chunk: str | dict, protected: list[str] | tuple[str, ...] = (),
+                       protected_classes: set[str] | None = None) -> bool:
+    """Return True if chunk belongs to a protected class (user_preference, policy, constraint, intent)."""
+    classes = protected_classes or PROTECTED_CLASSES
+    if isinstance(chunk, dict):
+        cls = chunk.get("class") or chunk.get("type") or chunk.get("category")
+        if cls in classes:
+            return True
+        raw = str(chunk.get("text") or chunk.get("content") or "")
+    else:
+        raw = str(chunk)
+    if is_user_preference(raw):
+        return True
+    for p in protected:
+        if p and (p in raw or raw in p):
+            return True
+    return False
+
+
 def extract_critical_spans(text: str) -> list[str]:
     """Identify numbers, amounts, negations, emails, and identifiers to protect from deletion."""
     spans = []
@@ -150,6 +201,9 @@ class TokenOptimizer:
     def compress(self, text: str, protected: tuple[str, ...] | list[str] = ()) -> str:
         if not text:
             return ""
+
+        if is_user_preference(text):
+            return text
 
         # Extract structured critical spans from the text itself
         critical_spans = extract_critical_spans(text)
@@ -220,23 +274,37 @@ class TokenOptimizer:
 
     # 2) context pruning ---------------------------------------------------------------
     def prune(self, chunks: list[str], query: str, budget: int,
-              min_similarity: float | None = None) -> tuple[list[str], list[str]]:
+              min_similarity: float | None = None,
+              protected: list[str] | tuple[str, ...] | None = None) -> tuple[list[str], list[str]]:
         if not chunks:
             return [], []
         cutoff = self.min_sim if min_similarity is None else min_similarity
         if not -1.0 <= cutoff <= 1.0:
             raise ValueError("min_similarity must be between -1 and 1")
-        eq = self.embedder.encode(query)
-        ranked = sorted(((cosine(self.embedder.encode(c), eq), i, c) for i, c in enumerate(chunks)), reverse=True)
-        keep, used = [], 0
+        prot_list = list(protected or [])
+        keep_indices = set()
+        used = 0
+        # Protected chunks (user_preference, policy, constraint, intent) are NEVER dropped by context pruning
+        for i, c in enumerate(chunks):
+            if is_protected_chunk(c, prot_list):
+                keep_indices.add(i)
+                used += count_tokens(c if isinstance(c, str) else str(c))
+        eq = self.embedder.encode(query) if self.embedder is not None else None
+        ranked = sorted(
+            ((cosine(self.embedder.encode(c if isinstance(c, str) else str(c)), eq) if eq is not None else 0.0, i, c)
+             for i, c in enumerate(chunks)),
+            reverse=True
+        )
         for sim, i, c in ranked:
-            n = count_tokens(c)
+            if i in keep_indices:
+                continue
+            n = count_tokens(c if isinstance(c, str) else str(c))
             if sim >= cutoff and used + n <= budget:
-                keep.append((i, c))
+                keep_indices.add(i)
                 used += n
-        keep.sort()
+        keep = [(i, chunks[i]) for i in sorted(keep_indices)]
         kept = [c for _, c in keep]
-        return kept, [c for c in chunks if c not in kept]
+        return kept, [c for i, c in enumerate(chunks) if i not in keep_indices]
 
     # 4) token budgeting ---------------------------------------------------------------
     def allocate(self, subtasks: list[str]) -> dict:
@@ -271,7 +339,7 @@ class TokenOptimizer:
         for i, task in enumerate(subtasks):
             key = f"subtask_{i}"
             context_budget = max(0, budgets[key] - count_tokens(task))
-            kept, _ = self.prune(cleaned_context, task, context_budget, min_similarity=min_similarity)
+            kept, _ = self.prune(cleaned_context, task, context_budget, min_similarity=min_similarity, protected=protected)
             context_by_subtask[key] = kept
         kept_set = {chunk for chunks in context_by_subtask.values() for chunk in chunks}
         kept = [chunk for chunk in cleaned_context if chunk in kept_set]

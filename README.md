@@ -6,11 +6,15 @@ FastAPI gateway, browser dashboard, and evaluation harness with InjecAgent data 
 ```bash
 python -m venv .venv && source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt                            # real MiniLM (bundled, ONNX) + LangGraph, no torch
+pip install -r requirements-ml.txt                         # optional: tiktoken exact token counts + sentence-transformers (PyTorch)
 python run.py                                              # dashboard + API -> http://127.0.0.1:8000
 python -m pytest -q                                        # test suite
 python scripts/evaluate.py all                             # regenerate results/*.json  (AgentDojo needs requirements-bench.txt)
 # Full Phase 6 command and service prerequisites are listed below.
 ```
+
+> **Note on Token Counting & ML Dependencies (`requirements-ml.txt`):**
+> Installing `requirements-ml.txt` (`pip install -r requirements-ml.txt`) adds `tiktoken` (cl100k_base) for exact BPE token counting and `sentence-transformers` (PyTorch). When `tiktoken` is not installed, DPVG automatically uses the local ONNX WordPiece tokenizer (`tokenizers`) or labeled heuristic estimation. The active counter source (`tiktoken`, `wordpiece`, or `approximate`) is tracked and displayed in the dashboard and across all generated summary tables.
 
 ## What changed versus the previous build (the six gaps)
 

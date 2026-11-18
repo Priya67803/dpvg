@@ -672,7 +672,8 @@ class Gateway:
                     Orchestrator(spt, reg, self.max_depth), strict_mode=effective_strict)
         goal = case.get("goal") or case["query"]
         spec = case.get("intent_spec") or {"goal": goal, "constraints": case.get("constraints", []), "policy": case.get("policy", [])}
-        protected = [str(v) for k in ("goal",) for v in [spec.get(k)] if v] + [str(x) for x in spec.get("constraints", []) + spec.get("policy", [])]
+        user_prefs = [str(x) for x in (case.get("user_preferences", []) or case.get("preferences", []) or spec.get("user_preferences", []))]
+        protected = [str(v) for k in ("goal",) for v in [spec.get(k)] if v] + [str(x) for x in spec.get("constraints", []) + spec.get("policy", [])] + user_prefs
         return _Run(case=case, mode=mode, st=st, spec=spec, protected=protected, goal=str(spec.get("goal") or goal),
                     context=case.get("context", []), t0=time.perf_counter(), strict_mode=effective_strict)
 

@@ -1,19 +1,22 @@
 {
-  "dataset": "built-in prototype validation split",
+  "dataset": "validation split (200 cases: prototype + InjecAgent base)",
   "split": "val",
+  "n_cases": 200,
   "backend": "vulnerable",
   "tau": 0.13,
+  "token_counter_source": "wordpiece",
   "g_ab_baseline": {
     "mode": "G-AB",
-    "n_cases": 19,
+    "n_cases": 200,
     "asr": 0.0,
-    "tcr_benign": 1.0,
+    "tcr_benign": 0.8879,
     "tcr_under_attack": 1.0,
     "r_tok": 0.0,
     "kept_chunk_count": 0,
     "mean_kept_chunk_relevance": null,
+    "token_counter_source": "wordpiece",
     "token_counter_sources": [
-      "tiktoken"
+      "wordpiece"
     ]
   },
   "points": [
@@ -21,15 +24,16 @@
       "cutoff": 0.0,
       "g_ab_plus_t": {
         "mode": "G-AB+T",
-        "n_cases": 19,
+        "n_cases": 200,
         "asr": 0.0,
-        "tcr_benign": 1.0,
+        "tcr_benign": 0.8879,
         "tcr_under_attack": 1.0,
-        "r_tok": 0.0713,
-        "kept_chunk_count": 143,
-        "mean_kept_chunk_relevance": 0.163,
+        "r_tok": 0.0402,
+        "kept_chunk_count": 1171,
+        "mean_kept_chunk_relevance": 0.1374,
+        "token_counter_source": "wordpiece",
         "token_counter_sources": [
-          "tiktoken"
+          "wordpiece"
         ]
       },
       "asr_not_worse_than_g_ab": true,
@@ -40,15 +44,16 @@
       "cutoff": 0.05,
       "g_ab_plus_t": {
         "mode": "G-AB+T",
-        "n_cases": 19,
+        "n_cases": 200,
         "asr": 0.0,
-        "tcr_benign": 1.0,
+        "tcr_benign": 0.8879,
         "tcr_under_attack": 1.0,
-        "r_tok": 0.1545,
-        "kept_chunk_count": 132,
-        "mean_kept_chunk_relevance": 0.1722,
+        "r_tok": 0.1575,
+        "kept_chunk_count": 990,
+        "mean_kept_chunk_relevance": 0.1548,
+        "token_counter_source": "wordpiece",
         "token_counter_sources": [
-          "tiktoken"
+          "wordpiece"
         ]
       },
       "asr_not_worse_than_g_ab": true,
@@ -59,15 +64,16 @@
       "cutoff": 0.1,
       "g_ab_plus_t": {
         "mode": "G-AB+T",
-        "n_cases": 19,
+        "n_cases": 200,
         "asr": 0.0,
-        "tcr_benign": 1.0,
+        "tcr_benign": 0.8879,
         "tcr_under_attack": 1.0,
-        "r_tok": 0.4281,
-        "kept_chunk_count": 86,
-        "mean_kept_chunk_relevance": 0.2106,
+        "r_tok": 0.2886,
+        "kept_chunk_count": 785,
+        "mean_kept_chunk_relevance": 0.1694,
+        "token_counter_source": "wordpiece",
         "token_counter_sources": [
-          "tiktoken"
+          "wordpiece"
         ]
       },
       "asr_not_worse_than_g_ab": true,
@@ -78,15 +84,16 @@
       "cutoff": 0.15,
       "g_ab_plus_t": {
         "mode": "G-AB+T",
-        "n_cases": 19,
+        "n_cases": 200,
         "asr": 0.0,
-        "tcr_benign": 1.0,
+        "tcr_benign": 0.8879,
         "tcr_under_attack": 1.0,
-        "r_tok": 0.509,
-        "kept_chunk_count": 62,
-        "mean_kept_chunk_relevance": 0.2367,
+        "r_tok": 0.4415,
+        "kept_chunk_count": 542,
+        "mean_kept_chunk_relevance": 0.1854,
+        "token_counter_source": "wordpiece",
         "token_counter_sources": [
-          "tiktoken"
+          "wordpiece"
         ]
       },
       "asr_not_worse_than_g_ab": true,
@@ -97,15 +104,16 @@
       "cutoff": 0.2,
       "g_ab_plus_t": {
         "mode": "G-AB+T",
-        "n_cases": 19,
+        "n_cases": 200,
         "asr": 0.0,
-        "tcr_benign": 1.0,
+        "tcr_benign": 0.8879,
         "tcr_under_attack": 1.0,
-        "r_tok": 0.619,
-        "kept_chunk_count": 42,
-        "mean_kept_chunk_relevance": 0.2705,
+        "r_tok": 0.5458,
+        "kept_chunk_count": 385,
+        "mean_kept_chunk_relevance": 0.185,
+        "token_counter_source": "wordpiece",
         "token_counter_sources": [
-          "tiktoken"
+          "wordpiece"
         ]
       },
       "asr_not_worse_than_g_ab": true,
@@ -116,15 +124,16 @@
       "cutoff": 0.25,
       "g_ab_plus_t": {
         "mode": "G-AB+T",
-        "n_cases": 19,
+        "n_cases": 200,
         "asr": 0.0,
-        "tcr_benign": 1.0,
+        "tcr_benign": 0.8879,
         "tcr_under_attack": 1.0,
-        "r_tok": 0.7499,
-        "kept_chunk_count": 21,
-        "mean_kept_chunk_relevance": 0.3636,
+        "r_tok": 0.6082,
+        "kept_chunk_count": 303,
+        "mean_kept_chunk_relevance": 0.1792,
+        "token_counter_source": "wordpiece",
         "token_counter_sources": [
-          "tiktoken"
+          "wordpiece"
         ]
       },
       "asr_not_worse_than_g_ab": true,
@@ -135,15 +144,16 @@
       "cutoff": 0.3,
       "g_ab_plus_t": {
         "mode": "G-AB+T",
-        "n_cases": 19,
+        "n_cases": 200,
         "asr": 0.0,
-        "tcr_benign": 1.0,
+        "tcr_benign": 0.8879,
         "tcr_under_attack": 1.0,
-        "r_tok": 0.7637,
-        "kept_chunk_count": 18,
-        "mean_kept_chunk_relevance": 0.3801,
+        "r_tok": 0.6243,
+        "kept_chunk_count": 275,
+        "mean_kept_chunk_relevance": 0.1674,
+        "token_counter_source": "wordpiece",
         "token_counter_sources": [
-          "tiktoken"
+          "wordpiece"
         ]
       },
       "asr_not_worse_than_g_ab": true,
@@ -154,15 +164,16 @@
       "cutoff": 0.35,
       "g_ab_plus_t": {
         "mode": "G-AB+T",
-        "n_cases": 19,
+        "n_cases": 200,
         "asr": 0.0,
-        "tcr_benign": 1.0,
+        "tcr_benign": 0.8879,
         "tcr_under_attack": 1.0,
-        "r_tok": 0.7977,
-        "kept_chunk_count": 14,
-        "mean_kept_chunk_relevance": 0.4069,
+        "r_tok": 0.6467,
+        "kept_chunk_count": 251,
+        "mean_kept_chunk_relevance": 0.1498,
+        "token_counter_source": "wordpiece",
         "token_counter_sources": [
-          "tiktoken"
+          "wordpiece"
         ]
       },
       "asr_not_worse_than_g_ab": true,
@@ -173,15 +184,16 @@
       "cutoff": 0.4,
       "g_ab_plus_t": {
         "mode": "G-AB+T",
-        "n_cases": 19,
+        "n_cases": 200,
         "asr": 0.0,
-        "tcr_benign": 1.0,
+        "tcr_benign": 0.8879,
         "tcr_under_attack": 1.0,
-        "r_tok": 0.8082,
-        "kept_chunk_count": 13,
-        "mean_kept_chunk_relevance": 0.4087,
+        "r_tok": 0.6626,
+        "kept_chunk_count": 228,
+        "mean_kept_chunk_relevance": 0.1293,
+        "token_counter_source": "wordpiece",
         "token_counter_sources": [
-          "tiktoken"
+          "wordpiece"
         ]
       },
       "asr_not_worse_than_g_ab": true,
@@ -192,15 +204,16 @@
       "cutoff": 0.45,
       "g_ab_plus_t": {
         "mode": "G-AB+T",
-        "n_cases": 19,
+        "n_cases": 200,
         "asr": 0.0,
-        "tcr_benign": 1.0,
+        "tcr_benign": 0.8879,
         "tcr_under_attack": 1.0,
-        "r_tok": 0.8446,
-        "kept_chunk_count": 8,
-        "mean_kept_chunk_relevance": 0.4322,
+        "r_tok": 0.666,
+        "kept_chunk_count": 223,
+        "mean_kept_chunk_relevance": 0.1239,
+        "token_counter_source": "wordpiece",
         "token_counter_sources": [
-          "tiktoken"
+          "wordpiece"
         ]
       },
       "asr_not_worse_than_g_ab": true,
@@ -211,15 +224,16 @@
       "cutoff": 0.5,
       "g_ab_plus_t": {
         "mode": "G-AB+T",
-        "n_cases": 19,
+        "n_cases": 200,
         "asr": 0.0,
-        "tcr_benign": 1.0,
+        "tcr_benign": 0.8879,
         "tcr_under_attack": 1.0,
-        "r_tok": 0.8515,
-        "kept_chunk_count": 7,
-        "mean_kept_chunk_relevance": 0.4034,
+        "r_tok": 0.6666,
+        "kept_chunk_count": 222,
+        "mean_kept_chunk_relevance": 0.1216,
+        "token_counter_source": "wordpiece",
         "token_counter_sources": [
-          "tiktoken"
+          "wordpiece"
         ]
       },
       "asr_not_worse_than_g_ab": true,
@@ -230,15 +244,16 @@
       "cutoff": 0.55,
       "g_ab_plus_t": {
         "mode": "G-AB+T",
-        "n_cases": 19,
+        "n_cases": 200,
         "asr": 0.0,
-        "tcr_benign": 1.0,
+        "tcr_benign": 0.8879,
         "tcr_under_attack": 1.0,
-        "r_tok": 0.913,
-        "kept_chunk_count": 0,
-        "mean_kept_chunk_relevance": null,
+        "r_tok": 0.6725,
+        "kept_chunk_count": 215,
+        "mean_kept_chunk_relevance": 0.1124,
+        "token_counter_source": "wordpiece",
         "token_counter_sources": [
-          "tiktoken"
+          "wordpiece"
         ]
       },
       "asr_not_worse_than_g_ab": true,
@@ -249,21 +264,21 @@
       "cutoff": 0.6,
       "g_ab_plus_t": {
         "mode": "G-AB+T",
-        "n_cases": 19,
+        "n_cases": 200,
         "asr": 0.0,
-        "tcr_benign": 1.0,
+        "tcr_benign": 0.8879,
         "tcr_under_attack": 1.0,
-        "r_tok": 0.913,
-        "kept_chunk_count": 0,
-        "mean_kept_chunk_relevance": null,
+        "r_tok": 0.6725,
+        "kept_chunk_count": 215,
+        "mean_kept_chunk_relevance": 0.1124,
+        "token_counter_source": "wordpiece",
         "token_counter_sources": [
-          "tiktoken"
+          "wordpiece"
         ]
       },
       "asr_not_worse_than_g_ab": true,
       "benign_tcr_not_worse_than_g_ab": true,
       "attack_tcr_not_worse_than_g_ab": true
     }
-  ],
-  "limit": null
+  ]
 }

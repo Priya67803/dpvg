@@ -14,7 +14,7 @@ from .llm_backends import LLMError
 from .embeddings import load_calibration
 from .gateway import DEFAULT_MODE, MODES, Gateway, RuntimeBlockException
 from .registry import VectorRegistry
-from .token_opt import TokenOptimizer, count_tokens
+from .token_opt import TokenOptimizer, count_tokens, get_token_counter_source
 
 app = FastAPI(title="Dual-Plane Runtime Verification Gateway", version=__version__)
 FRONTEND = pathlib.Path(__file__).resolve().parent.parent / "frontend"
@@ -182,14 +182,15 @@ def optimize(body: dict = Body(...)):
     except (TypeError, ValueError) as e:
         raise HTTPException(422, f"invalid token optimization settings: {e}") from e
     ctx = [c for c in body.get("context", []) if c.strip()]
-    protected = [x for x in [body.get("goal")] + list(body.get("constraints", [])) + list(body.get("policy", [])) if x]
+    user_prefs = list(body.get("user_preferences", [])) or list(body.get("preferences", []))
+    protected = [x for x in [body.get("goal")] + list(body.get("constraints", [])) + list(body.get("policy", [])) + user_prefs if x]
     r = opt.optimize(body["query"], ctx, protected, min_similarity=cutoff)
     return {"query": r.query, "subtasks": r.subtasks, "budget": r.budget,
             "context_by_subtask": r.context_by_subtask, "context_similarity_cutoff": cutoff,
             "kept_context": r.context,
             "dropped_context": r.dropped_context, "tokens_before": r.tokens_before, "tokens_after": r.tokens_after,
             "r_tok": round(r.r_tok, 4), "protected": protected,
-            "counter": "tiktoken" if _tiktoken() else "approximate"}
+            "counter": get_token_counter_source()}
 
 
 @app.post("/api/align")
