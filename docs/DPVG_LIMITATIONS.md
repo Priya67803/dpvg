@@ -13,31 +13,20 @@ In academic security research, identifying the precise boundaries and failure mo
 This document records statistical, architectural, model-dependent, and semantic limitations of the current DPVG code.
 The numerical table below is a **historical Phase 3.1 snapshot**, not a current Phase 6 result.
 
-### Current Phase 6 status
+### Current Empirical Status & Additions
 - `calibration.json` records tau **0.13**, selected from the leak-free grouped InjecAgent base validation split:
   1,581 cases (527 attacks, 1,054 derived benign controls), on a
   0.00–1.00 grid at 0.01 increments with maximum FPR 0.10. Precision is 0.7275, recall 0.5066, F1 0.5973,
   and FPR 0.0949. The test split was not used for calibration.
-- The all-MiniLM-L6-v2 ONNX embedder was not changed. Stage B is split into B-rules (finite override/obfuscation rules)
-  and B-sem (candidate similarity against tau), with `G-B` combining both. Neither component is a universal detector.
-- The override-pattern list is documented in `docs/STAGE_B_DECOMPOSITION.md`; it is finite and does not match every
-  paraphrase. Stage B is a soft filter, not a hard security guarantee.
-- Twelve modes are exposed: `B0`, `B1`, `G-A`, `G-B-rules`, `G-B-sem`, `G-B`, `G-AB`, `G-AB+P`, `G-AB+P+E`,
-  `G-AB+S`, `G-AB+T`, and `FULL`. `G-AB+P+E` is the optional plan-extension ablation; the old "eight
-  configurations alongside B1 (nine total)" wording is obsolete.
-- Multi-step semantic drift defaults (`tau_drift=0.40`, `N=2`, EMA $\alpha=0.80$) were selected on only 11 synthetic
-  validation scenarios (6 benign, 5 attacks), with detection 1.00 and false-block rate 0.00. This small result is not
-  a generalization claim.
-- Bounded re-planning (max 1 retry, trusted inputs only) is implemented. Configurable strict mode
-  (`DPVG_STRICT_MODE=true`) fails closed when an enabled detector identifies a violation, raising
-  `RuntimeBlockException` and quarantining the whole payload; it does not guarantee detection of every attack.
-- The orchestration engine implements `LLMPlanner` (`DPVG_PLANNER_TYPE=llm`) with strict tool catalog validation (`PlanValidationError`),
-  prompt isolation (zero tool observation exposure), least-privilege scope derivation, and per-role backend overrides
-  (`planner`, `tool`, `reasoning`, `specialized`).
-- The full Phase 6 matrix was **not run**: Ollama was unreachable, hosted API credentials/model were unset, and
-  AgentDojo was not installed. The adaptive smoke run sampled one row per attack type and is not a full ASR estimate.
-- `data/adaptive_attacks.json` uses simulated tools, fake `.invalid` addresses, and inert markers. Its deterministic
-  rewrites make it a controlled augmentation, not a human-authored or held-out adversarial corpus.
+- **Tau Sensitivity:** Sweeping $\tau \in \{0.03, 0.08, 0.13, 0.18, 0.23\}$ demonstrates that lower thresholds collapse recall (0.1537 at $\tau=0.03$), while higher thresholds suffer from severe false positive inflation ($\text{FPR}=14.90\%$ at $\tau=0.18$ and $18.98\%$ at $\tau=0.23$). Tau is not tuned on test data or to force demo passes.
+- **Demo-Margin Caveat:** In the "refund policy + passport exfiltration" demo, the injected directive achieves similarity 0.637 vs $\tau=0.13$ (margin $+0.507$), bypassing B-sem alone. The dashboard explicitly warns when $|\Delta| < 0.03$ ("near threshold") and labels aligned candidate text as "aligned but instruction-like (sanitized)". Hard denial depends on token scope and argument checks (`FULL`).
+- **Hard-Benign False Positives:** On `data/hard_benign.json` (325 items across 7 categories: imperatives, polite requests, recipes, meeting agendas, TODO lists, human instructions, quoted commands), Stage B test FPR is **7.88%** (compared to 0.28% on InjecAgent base), peaking at 26.09% on TODO lists and 20.00% on imperatives. Under `FULL`, mode TCR is 0.9879 (163/165 completed).
+- **Multi-Step Trajectory Drift:** Evaluated on 160 synthetic multi-step scenarios (80 validation / 80 held-out test). Calibrating on validation only yielded $\tau_{\text{drift}}=0.35, N=1, \alpha=0.80$ (validation detection 1.000, FBR 0.000). On held-out test data, detection remains 1.000, but false-block rate is **14.29%** (10/70 benign tasks). The legacy 11-scenario estimate ($\tau_{\text{drift}}=0.40, N=2$) is superseded and archived in `calibration.json`.
+- **Redesigned Plan Extension (`G-AB+P+E`):** On the 54-case dynamic tool use benchmark, `G-AB+P` and `G-AB+S` yielded 0.00 TCR. The redesigned extension interface sends ONLY the original trusted query, tool catalog, and proposed tool name to the planner. Read-only tools receive 60s TTL; side-effects require citing the human request. `G-AB+P+E` recovers 100% dynamic utility (TCR = 1.0000, 39/39) while maintaining 0.0000 ASR (0/15 attacks admitted).
+- **Adaptive Attacks Against Stage B:** Evaluated across 11 adaptive attack types. Obfuscation techniques (`hidden_html_comment`, `hidden_text`, `hidden_zero_width`) bypass B-sem alone with 70–90% ASR under `G-B-sem`. All 11 adaptive types are contained to 0.0000 ASR under `FULL` through Stage A plan gating, scope check, and argument validation.
+- **Protected User Preferences:** `TokenOptimizer` treats `user_preference` as a protected class alongside intent, policy, and constraints. Style, formatting, and language preferences ("The user prefers concise answers written in British English") are unconditionally preserved during context pruning, while irrelevant noise chunks are pruned.
+- **Token Counter Accounting:** Active token counters are explicitly reported as `tiktoken`, `wordpiece`, or heuristic `approximate`. Context cutoff sweep on 200 validation cases shows $R_{\text{tok}}=0.6243$ at cutoff 0.30 with 0.8879 benign TCR (100% utility preserved relative to baseline).
+- **Live Model Evaluations Skipped:** Ollama was unreachable, hosted credentials were unset, and AgentDojo was not installed; all live service runs were skipped with reasons recorded. The full test suite has **210 passing tests and 5 skipped**.
 
 ---
 

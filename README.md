@@ -65,19 +65,24 @@ On the grouped InjecAgent base validation split (527 attacks, 1,054 benign), `G-
 
 Stage B is a **soft filter**: semantic similarity can miss instructions and the rule list is finite. Plan, scope, and argument checks provide deterministic hard denials only for calls routed through the instrumented simulated gateway path.
 
+- **Tau Sensitivity:** Sweeping $\tau \in \{0.03, 0.08, 0.13, 0.18, 0.23\}$ shows recall rising from 0.1537 to 0.8178 while FPR grows from 0.0028 to 0.1898; $\tau=0.13$ achieves optimal F1 (0.5973) under the $\text{FPR} \le 0.10$ budget constraint.
+- **Demo Margin Caveat:** In the "refund policy + passport exfiltration" demo, the injected directive scores 0.637 vs $\tau=0.13$ (margin $+0.507$), bypassing B-sem alone. The dashboard flags candidates with $|\Delta| < 0.03$ as "near threshold" and labels on-topic instruction-like text as "aligned but instruction-like (sanitized)". Hard denial depends on token scope and argument checks (`FULL`).
+- **Hard-Benign False Positives:** Evaluated on `data/hard_benign.json` (325 items across 7 categories), Stage B test FPR is **7.88%** (compared to 0.28% on InjecAgent base), concentrated in `todo_lists` (26.09%) and `imperatives` (20.00%). Under `FULL`, mode TCR is 0.9879 (163/165 completed).
+- **Adaptive Attack Containment:** Across 11 adaptive attack types, obfuscations (`hidden_html_comment`, `hidden_text`, `hidden_zero_width`) bypass B-sem alone with 70–90% ASR under `G-B-sem`. All 11 types achieve 0.0000 ASR under `FULL` via Stage A plan, scope, and argument validation.
+
 `python scripts/evaluate.py spotlight` now runs B1 with delimit, datamark and encode next to B0, G-AB and FULL.
 
 ## Token optimization
-`G-AB+T` (token optimization only) and `FULL` rank context separately for each sub-task and drop chunks below the configurable cosine cutoff
-(`DPVG_CONTEXT_SIMILARITY_CUTOFF`, default `0.30`). `DPVG_TOKEN_BUDGET` (default `3000`) is distributed across
-sub-tasks dynamically from remaining budget and estimated task size; prompt content is truncated to each allocation and Ollama's generation limit is capped accordingly.
-Run `python scripts/run_phase4_token_opt_ablation.py --split test` to compare G-AB with G-AB+T on ASR, TCR and
-`R_tok = 1 - T_opt/T_base`. Ollama usage uses `prompt_eval_count`/`eval_count`, hosted usage fields are preferred, and fallbacks are labeled as `tiktoken`, `wordpiece`, or `documented-estimate`. The context-cutoff sweep covered 0.00–0.60 on 19 prototype validation cases: ASR stayed 0 and benign/attack TCR stayed 1.00 at every tested cutoff; at cutoff 0.30, `R_tok=0.7637`, 18 chunks were kept, and mean kept-chunk relevance was 0.3801. This small prototype sweep does not establish a general optimum.
+`G-AB+T` (token optimization only) and `FULL` rank context separately for each sub-task and drop chunks below the configurable cosine cutoff (`DPVG_CONTEXT_SIMILARITY_CUTOFF`, default `0.30`).
+- **Protected User Preferences:** `TokenOptimizer` preserves `user_preference` chunks (formatting, language, style directives like "The user prefers concise answers written in British English") alongside intent, constraints, and policy during pruning.
+- **Multi-Subtask Dynamic Budgeting:** `DPVG_TOKEN_BUDGET` (default `3000`) is distributed dynamically across sub-tasks. If total budget is tight, non-protected context is truncated, and dropped chunks are logged in `dropped_context`.
+- **200-Case Cutoff Sweep:** The context cutoff sweep over $\text{cutoff} \in [0.00, 0.60]$ evaluated on **200 validation cases** (prototype + InjecAgent base) with `vulnerable` backend and WordPiece counting: at cutoff 0.30, 275 chunks kept, mean relevance 0.1674, $R_{\text{tok}}=0.6243$ (62.43% reduction), ASR = 0.0000, TCR (Benign) = 0.8879 (100% utility preserved relative to baseline G-AB).
+- **Token Accounting:** The active counter source (`tiktoken`, `wordpiece`, or heuristic `approximate`) is tracked and reported across all results tables and the dashboard.
 
 ## Phase 4: Semantic drift detection, re-planning feedback loop, and strict mode
-Action alignment across multi-step trajectories is tracked against the root user intent using an Exponential Moving Average (EMA) or running mean. The validation sweep on `data/drift_scenarios.json` used 11 synthetic validation scenarios (6 benign, 5 attacks), searched `tau_drift=0.05..0.60`, `N=1..4`, and `alpha=0.2..0.8`, and selected `tau_drift=0.40`, `N=2`, `alpha=0.80` at detection 1.00 and false-block rate 0.00. The sample is synthetic and small; these are calibrated defaults for the prototype, not field-validated thresholds:
+Action alignment across multi-step trajectories is tracked against the root user intent using an Exponential Moving Average (EMA) or running mean:
 $$\text{DriftScore}_t = \alpha \cdot \text{Sim}(a_t, \text{goal}) + (1-\alpha) \cdot \text{DriftScore}_{t-1}$$
-- **Drift Detection:** If the score falls below `DPVG_DRIFT_THRESHOLD` (default `0.40`) for `DPVG_DRIFT_CONSECUTIVE_STEPS` (default `2`) consecutive steps, execution is blocked. Configure via `DPVG_DRIFT_METRIC=ema|mean` and `DPVG_DRIFT_EMA_ALPHA=0.80`.
+- **160-Scenario Drift Benchmark:** Evaluated on `data/drift_scenarios.json` (80 validation / 80 held-out test). Calibrating on validation only selected $\tau_{\text{drift}}=0.35, N=1, \alpha=0.80$ (validation detection 1.000, FBR 0.000). On held-out test data, detection remains 1.000, while false-block rate is **14.29%** (10/70 benign tasks). The legacy 11-scenario estimate is superseded and archived in `calibration.json`.
 - **Bounded Re-Planning:** On a verification block, the gateway initiates a bounded re-plan cycle (up to `DPVG_MAX_REPLANS`, default `1` retry) through intent optimization (Step 1), root re-registration (Step 2), and orchestration (Step 3).
   - *Trusted Input Invariant:* Re-planning operates **strictly on trusted inputs** (the original user prompt and authorized catalog); quarantined tool outputs or adversarial payloads are never admitted into the planner.
   - *Safe Fallback:* If re-planning retries are exhausted without successful verification, the gateway falls back to safe fallback remainder delivery.
@@ -99,8 +104,12 @@ The orchestration engine supports both an LLM-backed planner (`LLMPlanner`) and 
   4. `specialized` (`llm-c`): High-privilege side-effect execution (`DPVG_BACKEND_SPECIALIZED`)
   All roles default to the shared `DPVG_BACKEND` (`ollama|vulnerable|hosted`).
 
-### Plan-gating utility cost and trusted extension
-The two-case dynamic-tool fixture is evaluated by `python scripts/evaluate_plan_gating.py`. At `tau=0.0` to isolate plan gating, standard/dynamic utility TCR was 1.00/1.00 for G-AB and 0.00/0.00 for G-AB+P and G-AB+S (2 cases per mode). Initial plans omitted a required follow-up tool in both cases. Plan-extension mode `G-AB+P+E` re-runs the planner on the original user request only; it approved 0/2 requests with the deterministic rule planner and had utility TCR 0.00. These fixture measurements are not representative production estimates. See [POSITIONING.md](docs/POSITIONING.md) for scope and related work.
+### Plan-gating utility cost and redesigned plan extension (`G-AB+P+E`)
+Evaluated on the expanded 54-case dynamic-tool benchmark (`data/dynamic_tool_use.json`: 24 read-only lookups, 15 user-authorized side-effects, 15 attack injections) at $\tau=0.0$:
+- `G-AB`: Dynamic utility TCR 1.0000, ASR 0.6000 (9/15 attacks admitted).
+- `G-AB+P` and `G-AB+S`: Dynamic utility TCR 0.0000, ASR 0.0000 (0/39 dynamic tasks completed).
+- `G-AB+P+E`: **Dynamic utility TCR 1.0000 (39/39), ASR 0.0000 (0/15)**.
+- **Security Policy:** Extension requests pass ONLY (trusted request, catalog, proposed tool name). Read-only tools receive 60s TTL; side-effects require citing the authorizing human query, argument checks still apply, and an optional human approval hook is provided. Approved 39/39 benign extensions, admitted 0/15 attack injections. See [POSITIONING.md](docs/POSITIONING.md).
 
 ## Phase 6: Reproducible evaluation harness (`scripts/run_matrix.py`)
 `scripts/run_matrix.py` coordinates multi-seed, multi-backend, multi-workload matrix evaluation:

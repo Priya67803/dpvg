@@ -155,7 +155,7 @@ For candidates extracted in a Stage B-enabled mode, B-sem quarantines candidates
 ### Invariant 5: Multi-Step Drift Bound & Trusted Re-Planning Invariant
 Action alignment across multi-hop trajectories is continuously tracked against root intent:
 $$\text{DriftScore}_t = \alpha \cdot \text{Sim}(a_t, \text{goal}) + (1-\alpha) \cdot \text{DriftScore}_{t-1}$$
-- If $\text{DriftScore}_t < \tau_{\text{drift}}$ (selected default 0.40) for $N=2$ consecutive steps, the action is blocked. The selected parameters ($\alpha=0.80$) come from 11 synthetic validation scenarios and are not broadly validated.
+- If $\text{DriftScore}_t < \tau_{\text{drift}}$ (calibrated default 0.35) for $N=1$ steps, the action is blocked. The parameters ($\tau_{\text{drift}}=0.35, N=1, \alpha=0.80$) are calibrated on 80 validation scenarios in `data/drift_scenarios.json` and evaluated on 80 held-out test scenarios (1.000 detection rate, 0.1429 false-block rate).
 - *Re-Planning Invariant:* Re-planning operates **strictly on trusted inputs** (original user prompt and tool catalog); quarantined tool outputs or adversary observations are never admitted.
 - *Strict Mode Fail-Stop:* When `strict_mode=True`, any misaligned directive or prompt injection marker triggers whole-payload quarantine (`⟦redacted: whole payload quarantined (strict mode)⟧`), audit record logging, and an immediate `RuntimeBlockException`.
 
@@ -164,6 +164,13 @@ $$\text{Obs} \cap \text{Inputs}(\text{Planner}) = \emptyset \quad \land \quad \t
 $$\implies S(\text{root}) \subseteq \text{Catalog}$$
 - The planner never receives tool outputs, raw observation buffers, or quarantined text.
 - Any plan proposing a tool outside the authorized catalog raises `PlanValidationError` and fails closed before capability token issuance.
+
+### Invariant 7: Isolated Plan Extension & Side-Effect Attenuation (`G-AB+P+E`)
+When an agent encounters a legitimate workflow need for an un-planned tool, plan extension re-queries the planner under strict zero-trust constraints:
+$$\text{Inputs}(\text{PlanExtension}) = \{\text{Query}_{\text{trusted}}, \text{Catalog}, \text{ToolName}_{\text{proposed}}\}$$
+- **Zero Observation Exposure:** Tool outputs, proposed arguments, and raw observation buffers are strictly excluded from the extension request.
+- **Classification & Attenuation:** Approved `read_only` tools receive scoped tokens with a short TTL (60s). Approved `side_effect` tools strictly require the planner to cite the authorizing excerpt from the trusted human prompt, enforce argument validation, and support an optional human-in-the-loop approval hook.
+- Injected requests attempting side-effect execution (e.g. `send_email` or `transfer_money` from an injection) fail closed (0.0000 ASR).
 
 ---
 
@@ -179,11 +186,14 @@ $$\implies S(\text{root}) \subseteq \text{Catalog}$$
 | **Token Replay** | Reusing valid SPT across tool calls / sessions | Nonce tracker & session binding check | Rejected as replay / cross-session reuse | `test_security_fixes.py::test_attenuation_19` |
 | **Direct Adapter Bypass** | Calling tool function outside the authorizing adapter | Adapter mediation | Outside the prototype's enforced path; tools in the built-in `DataPlane` are simulated | `test_security_fixes.py::test_scope_07` |
 | **Depth Exhaustion** | Delegation beyond the configured bound | `max_depth` enforcement (default 6) | Rejected at depth limit | `test_security_fixes.py::test_attenuation_17` |
-| **Multi-Hop Drift** | Gradual steering away from root intent across hops | Drift monitor (EMA $\alpha=0.80$, $N=2$) | Blocked when drift stays below selected $\tau_{\text{drift}}=0.40$ | `test_phase4_drift_replan.py::test_drift_detector_ema` |
+| **Multi-Hop Drift** | Gradual steering away from root intent across hops | Drift monitor (EMA $\alpha=0.80$, $N=1$, $\tau=0.35$) | Blocked when drift stays below calibrated threshold | `test_hard_benign_drift.py::test_drift_calibrated_thresholds_test_split` |
 | **Adversarial Re-Plan Steering** | Injected observation attempting to redirect re-plan | Trusted input invariant (Step 1-3 re-run) | Planner sees only original prompt; injection excluded | `test_phase4_drift_replan.py::test_replan_trusted_inputs_only` |
 | **Strict Mode Fail-Stop** | Injection detected under zero-tolerance policy | Strict Mode (`RuntimeBlockException`) | Whole payload quarantined; execution halts | `test_phase4_drift_replan.py::test_strict_mode_exception` |
 | **Planner Tool Hallucination** | LLM planner naming unauthorized tools | Tool catalog schema gating | Rejected via `PlanValidationError`; fails closed | `test_phase5_planner_roles.py::test_llm_planner_rejects_uncataloged_tools` |
 | **Planner Data Poisoning** | Adversary trying to poison future plans via tool obs | Planner prompt isolation | Planner never receives tool outputs | `test_phase5_planner_roles.py::test_planner_never_receives_tool_output` |
+| **Plan Extension Injection** | Untrusted injection requesting un-planned side-effect tool | Redesigned `G-AB+P+E` extension | Denied: lacks user query authorization citation | `test_plan_extension.py::test_extension_injection_denied` |
+| **Adaptive B-sem Evasion** | Cosine-similarity maximizing / camouflaged attack | Stage A plan gating, scope, and argument check | B-sem soft filter bypassed, blocked at Stage A (`FULL`) | `test_adaptive_security.py::test_adaptive_attack_passes_b_sem_alone_and_stopped_by_full` |
+| **User Preference Loss** | Context pruning dropping styling/formatting directives | Protected `user_preference` class in `TokenOptimizer` | Preferences preserved; noise distractors pruned | `test_token_opt_fidelity.py::test_user_preference_preserved_while_distractors_pruned` |
 
 ---
 

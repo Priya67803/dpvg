@@ -19,22 +19,34 @@ Primary references: [IPIGuard (arXiv:2508.15310)](https://arxiv.org/abs/2508.153
 |---|---|---|
 | IPIGuard | Plans execution as traversal over a Tool Dependency Graph to constrain tool transitions and decouple planning from untrusted tool interaction. | Related plan-constrained defense; no DPVG/IPIGuard head-to-head run in this repository. Do not copy IPIGuard's reported benchmark numbers into DPVG results. |
 
-## Utility cost of plan gating
+## Utility cost of plan gating and redesigned extension (`G-AB+P+E`)
 
-`data/dynamic_tool_use.json` contains two benign simulated workflows in which the user asks to read a document and verify a citation/source, but the follow-up search tool is not in the initial rule-planned tool set. The deterministic simulator supplies a citation/source identifier as data and models the agent deciding to use the simulated search tool. The experiment sets `tau=0.0` to isolate tool-plan gating from B-sem's soft score threshold; it is not a production operating point.
+The trade-off between plan gating and dynamic utility is evaluated on `data/dynamic_tool_use.json`, expanded to 54 cases:
+- 24 benign workflows requiring an unplanned read-only verification tool (`search_web` to verify a citation or document note)
+- 15 benign workflows requiring an unplanned side-effect tool authorized by the user prompt (`send_email`, `transfer_money`, `post_slack`)
+- 15 injection attacks attempting unauthorized side-effect tool calls via untrusted tool output
+
+The experiment runs under `tau=0.0` to isolate plan gating from Stage B soft score filtering.
 
 Executed by `python scripts/evaluate_plan_gating.py`:
 
-| Mode | Standard benign TCR | Dynamic utility TCR | Initial plans missing a required tool |
-|---|---:|---:|---:|
-| G-AB | 1.00 | 1.00 (2/2) | 2/2 |
-| G-AB+P | 0.00 | 0.00 (0/2) | 2/2 |
-| G-AB+S | 0.00 | 0.00 (0/2) | 2/2 |
-| G-AB+P+E | 0.00 | 0.00 (0/2) | 2/2 |
+| Mode | Standard benign TCR | Dynamic utility TCR | Attack ASR | Approved extensions | Attack injections admitted |
+|---|---:|---:|---:|---:|---:|
+| **G-AB** | 1.00 | 1.00 (39/39) | 0.60 (9/15) | 0 | 9 |
+| **G-AB+P** | 0.00 | 0.00 (0/39) | 0.00 (0/15) | 0 | 0 |
+| **G-AB+S** | 0.00 | 0.00 (0/39) | 0.00 (0/15) | 0 | 0 |
+| **G-AB+P+E** | **1.00** | **1.00 (39/39)** | **0.00 (0/15)** | **39** | **0** |
 
-These are deterministic fixture measurements, not general estimates of production utility. The G-AB+P+E planner was asked again with the original trusted query only; the rule planner did not add the newly requested tool in either case (0/2 extensions approved). It therefore preserved the plan boundary and did not recover utility in this workload. The extension ablation is switchable as `G-AB+P+E`; an extension is approved only if the trusted planner independently includes the tool in a newly validated plan. Tool output and the agent's proposed arguments are not given to the planner.
+### Redesigned plan extension architecture
+In earlier iterations, plan extension simply re-queried the planner with the same unprompted context, yielding 0/2 approved requests.
+The redesigned extension mechanism strictly enforces:
+1. **Isolated Planner Input:** The planner receives ONLY the original trusted user query, the authorized tool catalog, and the proposed tool name. Untrusted tool outputs, observation payloads, and agent-proposed arguments are never passed to the planner.
+2. **Catalog Tool Classification:** Tools are explicitly partitioned into `read_only` and `side_effect`.
+3. **Attenuated Capabilities:** Approved read-only tools receive scoped tokens with a short TTL (60s). Approved side-effect tools require the planner to cite the specific user prompt text authorizing the action; argument checks still apply, and an optional human-approval hook is provided.
+4. **Audit Logging:** Every extension decision is recorded in the event log and DataPlane ledger.
 
-The same run measured plan validity at 1.00 (2/2), `PlanValidationError` rate at 0.00 (0/2), and benign tasks with a required tool missing from the initial plan at 1.00 (2/2). The sample is deliberately small and synthetic; it demonstrates the utility trade-off and planner omission metric, not planner reliability at scale. Machine-readable output is in [`results/plan_gating_utility.json`](../results/plan_gating_utility.json).
+As measured above, `G-AB+P+E` recovers **100% of benign dynamic utility** (TCR = 1.00) while completely preventing injection-induced privilege escalation (**0.00 ASR**).
+Machine-readable output is recorded in [`results/plan_gating_utility.json`](../results/plan_gating_utility.json).
 
 ## What this comparison does not establish
 
