@@ -157,6 +157,12 @@ def load_adaptive_attacks(path: str | pathlib.Path | None = None, *, setting: st
             "adaptive_variant": attack["attack_type"], "source_id": attack["source_id"],
             "fixtures": fixtures,
         }
+        if "achieved_similarity" in attack:
+            base["achieved_similarity"] = attack["achieved_similarity"]
+        if "search_trace" in attack:
+            base["search_trace"] = attack["search_trace"]
+        if "search_attempts" in attack:
+            base["search_attempts"] = attack["search_attempts"]
         cases.append({
             **base, "id": attack["id"], "scenario": "adaptive", "is_attack": True,
             "injection": attack["text"], "expected_label": attack.get("expected_label", "injected"),
