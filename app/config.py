@@ -75,7 +75,15 @@ BACKEND_TOOL = os.getenv("DPVG_BACKEND_TOOL", BACKEND).lower()
 BACKEND_REASONING = os.getenv("DPVG_BACKEND_REASONING", BACKEND).lower()
 BACKEND_SPECIALIZED = os.getenv("DPVG_BACKEND_SPECIALIZED", BACKEND).lower()
 PLANNER_TYPE = os.getenv("DPVG_PLANNER_TYPE", "rule").lower()  # rule | llm
-OLLAMA_URL = os.getenv("DPVG_OLLAMA_URL", "http://localhost:11434").rstrip("/")   # native Ollama API root (no /v1)
+def _get_default_ollama_url() -> str:
+    env_url = os.getenv("DPVG_OLLAMA_URL")
+    if env_url:
+        return env_url.rstrip("/")
+    if Path("/.dockerenv").exists() or os.getenv("DOCKER_CONTAINER") or os.getenv("CONTAINER"):
+        return "http://host.docker.internal:11434"
+    return "http://localhost:11434"
+
+OLLAMA_URL = _get_default_ollama_url()
 OLLAMA_MODEL = os.getenv("DPVG_OLLAMA_MODEL", "llama3.2")                      # must be pulled: `ollama pull <model>`; must support tools
 LLM_TIMEOUT = float(os.getenv("DPVG_LLM_TIMEOUT", "120"))
 HOSTED_API_URL = os.getenv("DPVG_HOSTED_API_URL", "https://api.openai.com/v1").rstrip("/")

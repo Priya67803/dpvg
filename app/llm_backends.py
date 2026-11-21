@@ -8,6 +8,8 @@ HTTP backends accept an httpx transport so request/response handling can be unit
 """
 from __future__ import annotations
 import json
+import os
+from pathlib import Path
 import re
 import time
 import httpx
@@ -110,13 +112,51 @@ class OllamaBackend:
 
     # -- connectivity
     def check(self) -> None:
-        """Raise BackendUnavailable unless the Ollama server is reachable and the configured model has been pulled."""
-        try:
-            r = self.client.get(f"{self.base_url}/api/tags")
-        except httpx.HTTPError as e:
-            raise BackendUnavailable(f"Ollama is unreachable at {self.base_url} ({e}). Start it with `ollama serve`.") from e
-        if r.status_code >= 400:
-            raise BackendUnavailable(f"Ollama at {self.base_url} answered HTTP {r.status_code}: {r.text[:200]}")
+        """Raise BackendUnavailable unless the Ollama server is reachable and the configured model has been pulled.
+        If the configured URL is connection-refused, automatically tests common Docker/host gateway URLs.
+        """
+        candidate_urls = [self.base_url]
+        for c in ("http://host.docker.internal:11434", "http://172.17.0.1:11434", "http://10.0.2.2:11434", "http://localhost:11434", "http://127.0.0.1:11434"):
+            if c not in candidate_urls:
+                candidate_urls.append(c)
+
+        r = None
+        last_e = None
+        working_url = None
+
+        for url in candidate_urls:
+            try:
+                test_r = self.client.get(f"{url}/api/tags")
+                if test_r.status_code < 400:
+                    working_url = url
+                    r = test_r
+                    break
+            except httpx.HTTPError as e:
+                if url == self.base_url:
+                    last_e = e
+                # Only try candidates if connection was refused/timed out on the configured URL
+                if not isinstance(e, (httpx.ConnectError, httpx.ConnectTimeout)):
+                    break
+
+        if r is None or working_url is None:
+            in_docker = Path("/.dockerenv").exists() or os.getenv("DOCKER_CONTAINER") or "docker" in self.base_url
+            if in_docker or "localhost" in self.base_url or "127.0.0.1" in self.base_url:
+                err_msg = (
+                    f"Ollama is unreachable at {self.base_url} ({last_e}).\n"
+                    "If running in Docker/deployment with Ollama on the host machine:\n"
+                    "1. Ollama only listens on 127.0.0.1 by default. On your host machine, set environment variable "
+                    "OLLAMA_HOST=0.0.0.0 (or OLLAMA_HOST=0.0.0.0:11434) and restart Ollama.\n"
+                    "2. Pass DPVG_OLLAMA_URL=http://host.docker.internal:11434 to Docker, "
+                    "and add '--add-host=host.docker.internal:host-gateway' to your docker run command."
+                )
+            else:
+                err_msg = f"Ollama is unreachable at {self.base_url} ({last_e}). Start it with `ollama serve`."
+            raise BackendUnavailable(err_msg)
+
+        if working_url != self.base_url:
+            self.base_url = working_url
+            config.OLLAMA_URL = working_url
+
         have = {m.get("name", "") for m in r.json().get("models", [])}
         want = self.model if ":" in self.model else self.model + ":latest"
         if want not in have and self.model not in have:
