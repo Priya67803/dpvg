@@ -56,6 +56,17 @@
         <button type="button" id="resetTauBtn" class="sm" title="Reset τ to calibrated default">Reset to default</button>
       </div>
       <label>Agent backend <select id="backend"></select></label>
+      <div id="ollamaConfigRow" style="margin-bottom: 12px; padding: 8px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+        <div class="row align-center" style="gap: 8px;">
+          <label style="flex:1; margin-bottom: 0; font-size: 12px; font-weight: 600;">Ollama Endpoint URL
+            <input type="text" id="ollamaUrl" placeholder="http://host.docker.internal:11434" style="margin-top: 4px; font-size: 12px; font-family: monospace;">
+          </label>
+          <button type="button" id="reconnectOllamaBtn" class="sm" style="margin-top: 18px; padding: 4px 10px;">Connect</button>
+        </div>
+        <span class="hint" style="font-size: 11px; margin-top: 4px; display: block; color: #64748b;">
+          Docker on host: <code>http://host.docker.internal:11434</code> | Host IP: <code>http://10.101.90.213:11434</code>
+        </span>
+      </div>
       <div class="row">
         <button class="primary" id="runBtn">Run gateway</button>
         <button id="cmpBtn">Compare all configurations</button>

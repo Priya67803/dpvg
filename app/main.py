@@ -62,6 +62,18 @@ def health():
             "token_counter": "tiktoken" if _tiktoken() else "approximate"}
 
 
+@app.post("/api/ollama/configure")
+def configure_ollama(body: dict = Body(...)):
+    new_url = body.get("url")
+    new_model = body.get("model")
+    if new_url:
+        config.OLLAMA_URL = str(new_url).rstrip("/")
+    if new_model:
+        config.OLLAMA_MODEL = str(new_model).strip()
+    status = _ollama_status()
+    return {"status": "ok", "ollama": status}
+
+
 def _tiktoken() -> bool:
     from . import token_opt
     return token_opt._ENC is not None

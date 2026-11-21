@@ -55,11 +55,43 @@ async function init() {
   let backends;
   [HEALTH, MODES, { cases: CASES }, backends] = await Promise.all([api("health"), api("modes"), api("cases"), api("backends")]);
   if (HEALTH.backend === "ollama" && !HEALTH.ollama.ready) { $("#banner").className = "banner bad"; $("#banner").textContent = "Ollama not ready: " + HEALTH.ollama.error; }
+  if ($("#ollamaUrl") && HEALTH.ollama && HEALTH.ollama.url) $("#ollamaUrl").value = HEALTH.ollama.url;
+  if ($("#reconnectOllamaBtn")) {
+    $("#reconnectOllamaBtn").addEventListener("click", async () => {
+      const url = $("#ollamaUrl").value.trim();
+      if (!url) return;
+      $("#reconnectOllamaBtn").textContent = "...";
+      try {
+        await api("ollama/configure", { url });
+        HEALTH = await api("health");
+        if (HEALTH.ollama && HEALTH.ollama.ready) {
+          $("#banner").className = "banner idle";
+          $("#banner").textContent = `Connected to Ollama at ${HEALTH.ollama.url} (${HEALTH.ollama.model})! Pick a scenario and run it.`;
+        } else {
+          $("#banner").className = "banner bad";
+          $("#banner").textContent = "Ollama not ready: " + (HEALTH.ollama ? HEALTH.ollama.error : "Unknown error");
+        }
+        updateChips();
+      } catch (err) {
+        $("#banner").className = "banner bad";
+        $("#banner").textContent = "Failed to connect: " + err.message;
+      } finally {
+        $("#reconnectOllamaBtn").textContent = "Connect";
+      }
+    });
+  }
   $("#backend").innerHTML = backends.available.map((b) => `<option value="${esc(b.key)}">${esc(b.label)}</option>`).join("");
   $("#backend").value = backends.default;
   CURRENT_TAU = HEALTH.default_tau;
   setTau(HEALTH.default_tau);
-  $("#backend").addEventListener("change", () => updateChips($("#backend").value));
+  const updateBackendVisibility = () => {
+    if ($("#ollamaConfigRow")) $("#ollamaConfigRow").style.display = $("#backend").value === "ollama" ? "block" : "none";
+  };
+  $("#backend").addEventListener("change", () => {
+    updateChips($("#backend").value);
+    updateBackendVisibility();
+  });
+  updateBackendVisibility();
   $("#tau").addEventListener("input", (e) => setTau(e.target.value));
   $("#alTau").addEventListener("input", (e) => setTau(e.target.value));
   if ($("#evTau")) $("#evTau").addEventListener("input", (e) => setTau(e.target.value));
