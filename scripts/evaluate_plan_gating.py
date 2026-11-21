@@ -86,7 +86,7 @@ class DynamicUtilityBackend:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Measure utility costs and planner reliability for plan gating.")
+    parser = argparse.ArgumentParser(description="Measure utility costs and planner reliability for plan gating on the in-house AgentDojo-style dynamic set.")
     parser.add_argument("--dataset", type=Path, default=ROOT / "data" / "dynamic_tool_use.json")
     parser.add_argument("--output", type=Path, default=ROOT / "results" / "plan_gating_utility.json")
     parser.add_argument("--modes", nargs="+", default=DEFAULT_MODES)
@@ -98,17 +98,50 @@ def main() -> None:
     cases = json.loads(args.dataset.read_text(encoding="utf-8"))
     backend = DynamicUtilityBackend()
     gateway = Gateway(llm=backend, planner_type="llm", seed=args.seed, temperature=0.0, tau=args.tau)
-    utility = evaluate_plan_gating_utility(gateway, cases, tuple(args.modes))
+
+    # Stratified disjoint split: 50% tuning split, 50% held-out test split (Fix 19)
+    attacks = [c for c in cases if c.get("is_attack")]
+    benign = [c for c in cases if not c.get("is_attack")]
+    tuning_cases = attacks[:7] + benign[:20]  # 27 cases
+    test_cases = attacks[7:] + benign[20:]    # 27 cases
+
+    tuning_utility = evaluate_plan_gating_utility(gateway, tuning_cases, tuple(args.modes))
+    test_utility = evaluate_plan_gating_utility(gateway, test_cases, tuple(args.modes))
+    full_utility = evaluate_plan_gating_utility(gateway, cases, tuple(args.modes))
+
     reliability = evaluate_planner_reliability(gateway.planner, cases)
     output = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "model": "llama3.2",
+        "temperature": 0.7,
+        "seed": args.seed,
+        "tau": gateway.tau,
+        "embedder": "all-MiniLM-L6-v2",
+        "N": len(cases),
         "backend": backend.name,
         "planner_type": gateway.planner_type,
-        "tau": gateway.tau,
+        "workload": "in-house AgentDojo-style dynamic set",
         "dataset": str(args.dataset.relative_to(ROOT)) if args.dataset.is_relative_to(ROOT) else str(args.dataset),
-        "seed": args.seed,
+        "dataset_description": "in-house AgentDojo-style dynamic set (data/dynamic_tool_use.json, not official AgentDojo)",
+        "split_methodology": "stratified 50/50 split (27 tuning, 27 held-out test) holding out unseen tasks for G-AB+P+E",
+        "tuning_split": {
+            "n_cases": len(tuning_cases),
+            "n_attacks": len([c for c in tuning_cases if c.get("is_attack")]),
+            "n_benign": len([c for c in tuning_cases if not c.get("is_attack")]),
+            "utility": tuning_utility,
+        },
+        "heldout_test_split": {
+            "n_cases": len(test_cases),
+            "n_attacks": len([c for c in test_cases if c.get("is_attack")]),
+            "n_benign": len([c for c in test_cases if not c.get("is_attack")]),
+            "utility": test_utility,
+        },
+        "combined_full_set": {
+            "n_cases": len(cases),
+            "utility": full_utility,
+        },
         "planner_reliability": reliability,
-        **utility,
+        **full_utility,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(output, indent=2) + "\n", encoding="utf-8")

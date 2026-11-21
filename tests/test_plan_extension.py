@@ -18,7 +18,7 @@ from app import config
 from app.dataplane import ALL_TOOLS, READ_TOOLS, SIDE_EFFECT_TOOLS, is_read_only, is_side_effect, tool_classification
 from app.gateway import Gateway
 from app.agents import ProposedAction
-from app.llm_backends import VulnerableBackend
+from app.llm_backends import OllamaBackend
 
 
 # ---------------------------------------------------------------------------

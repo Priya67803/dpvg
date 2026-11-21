@@ -9,7 +9,7 @@ from app.embeddings import OnnxMiniLMEmbedder, cosine, default_tau, get_embedder
 from app.alignment import AlignmentEngine
 from app.evaluation import calibrate, sweep_candidate_tau, sweep_tau
 from app.gateway import MODES, Gateway
-from app.llm_backends import HostedAPIBackend, LLMError, OllamaBackend, VulnerableBackend
+from app.llm_backends import LLMError, OllamaBackend, BackendUnavailable
 from tests.fake_ollama import FakeOllama
 
 
@@ -188,15 +188,15 @@ def test_agentdojo_openai_proxy_applies_fixed_seed():
 
 def test_get_llm_selects_explicit_backend():
     assert isinstance(get_llm(), OllamaBackend) and get_llm().name.startswith("ollama:")
-    assert isinstance(get_llm("vulnerable"), VulnerableBackend)
-    assert isinstance(get_llm("hosted", model="test-model", api_key="test-key"), HostedAPIBackend)
-    with pytest.raises(ValueError, match="unknown backend"):
-        get_llm("unknown")
+    with pytest.raises(ValueError, match="not supported"):
+        get_llm("vulnerable")
+    with pytest.raises(ValueError, match="not supported"):
+        get_llm("hosted")
 
 
 def test_backend_errors_are_explicit_and_never_fall_back():
     down = OllamaBackend(retries=0, transport=httpx.MockTransport(lambda r: (_ for _ in ()).throw(httpx.ConnectError("refused"))))
-    with pytest.raises(LLMError, match="not reachable"):
+    with pytest.raises(LLMError, match="unreachable"):
         down.check()
     with pytest.raises(LLMError):
         down.decide("o", goal="g", tool="read_file")

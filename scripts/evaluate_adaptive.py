@@ -14,11 +14,11 @@ from app.evaluation import evaluate_mode
 from app.gateway import Gateway, PAPER_MODES
 
 
-def evaluate_adaptive(cases: list[dict], tau: float | None = None, seed: int = 0, embedder=None) -> dict:
+def evaluate_adaptive(cases: list[dict], tau: float | None = None, seed: int = 0, embedder=None, backend: str = "ollama", llm=None) -> dict:
     attacks = [case for case in cases if case.get("is_attack")]
     if not attacks:
         raise ValueError("adaptive evaluation requires at least one attack case")
-    gateway = Gateway(backend="vulnerable", tau=tau, seed=seed, embedder=embedder)
+    gateway = Gateway(backend=backend, tau=tau, seed=seed, embedder=embedder, llm=llm)
     modes = {}
     attack_types = sorted({case["attack_type"] for case in attacks})
     for mode in PAPER_MODES:

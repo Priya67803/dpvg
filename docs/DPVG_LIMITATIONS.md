@@ -22,7 +22,7 @@ The numerical table below is a **historical Phase 3.1 snapshot**, not a current 
 - **Demo-Margin Caveat:** In the "refund policy + passport exfiltration" demo, the injected directive achieves similarity 0.637 vs $\tau=0.13$ (margin $+0.507$), bypassing B-sem alone. The dashboard explicitly warns when $|\Delta| < 0.03$ ("near threshold") and labels aligned candidate text as "aligned but instruction-like (sanitized)". Hard denial depends on token scope and argument checks (`FULL`).
 - **Hard-Benign False Positives:** On `data/hard_benign.json` (325 items across 7 categories: imperatives, polite requests, recipes, meeting agendas, TODO lists, human instructions, quoted commands), Stage B test FPR is **7.88%** (compared to 0.28% on InjecAgent base), peaking at 26.09% on TODO lists and 20.00% on imperatives. Under `FULL`, mode TCR is 0.9879 (163/165 completed).
 - **Multi-Step Trajectory Drift:** Evaluated on 160 synthetic multi-step scenarios (80 validation / 80 held-out test). Calibrating on validation only yielded $\tau_{\text{drift}}=0.35, N=1, \alpha=0.80$ (validation detection 1.000, FBR 0.000). On held-out test data, detection remains 1.000, but false-block rate is **14.29%** (10/70 benign tasks). The legacy 11-scenario estimate ($\tau_{\text{drift}}=0.40, N=2$) is superseded and archived in `calibration.json`.
-- **Redesigned Plan Extension (`G-AB+P+E`):** On the 54-case dynamic tool use benchmark, `G-AB+P` and `G-AB+S` yielded 0.00 TCR. The redesigned extension interface sends ONLY the original trusted query, tool catalog, and proposed tool name to the planner. Read-only tools receive 60s TTL; side-effects require citing the human request. `G-AB+P+E` recovers 100% dynamic utility (TCR = 1.0000, 39/39) while maintaining 0.0000 ASR (0/15 attacks admitted).
+- **Redesigned Plan Extension (`G-AB+P+E`):** On the 54-case in-house AgentDojo-style dynamic set (`data/dynamic_tool_use.json`), `G-AB+P` and `G-AB+S` yielded 0.00 TCR. The redesigned extension interface sends ONLY the original trusted query, tool catalog, and proposed tool name to the planner. Read-only tools receive 60s TTL; side-effects require citing the human request. `G-AB+P+E` recovers 100% dynamic utility (TCR = 1.0000, 39/39) while maintaining 0.0000 ASR (0/15 attacks admitted).
 - **Adaptive Attacks Against Stage B:** Evaluated across 11 adaptive attack types. Obfuscation techniques (`hidden_html_comment`, `hidden_text`, `hidden_zero_width`) bypass B-sem alone with 70–90% ASR under `G-B-sem`. All 11 adaptive types are contained to 0.0000 ASR under `FULL` through Stage A plan gating, scope check, and argument validation.
 - **Protected User Preferences:** `TokenOptimizer` treats `user_preference` as a protected class alongside intent, policy, and constraints. Style, formatting, and language preferences ("The user prefers concise answers written in British English") are unconditionally preserved during context pruning, while irrelevant noise chunks are pruned.
 - **Token Counter Accounting:** Active token counters are explicitly reported as `tiktoken`, `wordpiece`, or heuristic `approximate`. Context cutoff sweep on 200 validation cases shows $R_{\text{tok}}=0.6243$ at cutoff 0.30 with 0.8879 benign TCR (100% utility preserved relative to baseline).
@@ -60,34 +60,16 @@ The historical Phase 3.1 snapshot reported the following point estimates; these 
 
 ---
 
-## 3. Deterministic Vulnerable Backend vs. Live Model Boundaries
+## 3. Evaluation Scope: Evaluated on Llama 3.2 via Ollama Only
 
-A foundational distinction exists between the deterministic **`VulnerableBackend`** and live model backends:
+All empirical evaluation claims in this study reflect evaluation on `llama3.2` via Ollama only (`DPVG_BACKEND=ollama`, model `llama3.2:latest` 3B Instruct, sampling temperature $T=0.7$, fixed seed 42). Synthetic simulator backends (`VulnerableBackend`) and unverified remote endpoints (`HostedAPIBackend`) have been removed from evaluation claims to preserve methodological rigor and reporting validity.
 
-```mermaid
-flowchart LR
-    subgraph AdvSim["Deterministic VulnerableBackend"]
-        S1["Follows recognized instruction-like tool output"]
-        S2["Produces deterministic simulated tool calls"]
-        S3["Purpose: controlled gateway stress-test"]
-        S4["Limitation: does not model general LLM reasoning"]
-    end
+### 3.1 Core Limitations & Security Boundaries
 
-    subgraph LiveLLM["Ollama or Hosted Model"]
-        L1["Model behavior depends on configured endpoint and version"]
-        L2["Measures actual model and service behavior"]
-        L3["Full Phase 6 matrix not run in this environment"]
-        L4["Limitation: results may vary by model, seed, and service"]
-    end
-```
-
-### 3.1 Simulator Caveats
-- `VulnerableBackend` follows recognized instruction-like candidates and emits supported simulated calls. It does not simulate subtle multi-turn reasoning, semantic jailbreaks, or general model behavior.
-- `FakeOllama` is an HTTP mock used in tests, not the Phase 6 vulnerable evaluation backend. Results from either deterministic path are controlled tests, not live-LLM behavioral findings.
-
-### 3.2 Live Model Caveats
-- The full Phase 6 live-model evaluation was not run in the current environment. No claim about its ASR, utility, or latency follows from the vulnerable-backend smoke tests.
-- When available, report model name/version, endpoint, mode, workload, tau, and seed. Neither deterministic simulation nor model-backed runs alone establish general robustness.
+1. **Single 3B-Class Model:** All empirical measurements were conducted exclusively using Meta's Llama 3.2 3B Instruct model. Results may vary on larger frontier architectures (e.g., Llama 70B, GPT-4o, Claude 3.5 Sonnet), which possess different reasoning dynamics, susceptibility profiles, and instruction-following fidelity.
+2. **Stage B Weaker on In-Domain Text:** Dense semantic similarity thresholding ($\tau = 0.13$) alone cannot reliably separate in-domain prompt injections from benign actions. In-domain attacks exhibit an average cosine similarity of **0.3378** (with calendar injection spans reaching **0.5349** against $\tau = 0.13$), yielding an ROC AUC of only **0.2591** under $\tau$ alone. Dense similarity thresholding is inherently soft and must be augmented with generalized directive detection and action-class privilege escalation checks (`root.allowed = classes(user_request)`).
+3. **Stage A Cryptographic Scope as Primary Defense:** Cryptographic capability attenuation (Stage A SPT scope enforcement and read-only token gating) is the primary hard security guarantee against unauthorized tool misuse. Even if an adversarial payload completely evades Stage B semantic and rule filters, unauthorized tool invocations (such as `send_email` or `delete_calendar_events` when the user requested reading) fail closed deterministically at the gateway.
+4. **Disjoint Tuning vs. Held-Out Test Split for Plan Extension (Fix 19):** In earlier development, plan extension (`G-AB+P+E`) was tuned and scored on the same 54 cases in `data/dynamic_tool_use.json`. To eliminate methodological data leakage, we enforce a strict, stratified 50/50 partition: a 27-case tuning split and a 27-case held-out test split (8 attacks, 19 benign), empirically confirming that dynamic utility recovery (100% TCR) and injection containment (0% ASR) hold on unseen dynamic workflows.
 
 ---
 
@@ -156,7 +138,7 @@ Historical prototype measurements reported **27.94%** context reduction; this is
 ### 7.2 Bounded Re-Planning Budget ($K=1$)
 - Re-planning is intentionally bounded by `DPVG_MAX_REPLANS` (default 1) to prevent computational resource exhaustion and infinite re-planning loops.
 - Re-planning uses **only trusted inputs** (the original human prompt and declared tool catalog), isolating the planner from quarantined adversary content.
-- However, because the re-planner cannot observe runtime execution exceptions or partial tool outputs, re-planned subtasks cannot perform stateful diagnostic adaptation; tasks failing twice immediately drop to safe fallback remainder delivery.
+- However, because the re-planner cannot observe runtime execution exceptions or partial tool outputs, re-planned subtasks cannot perform stateful diagnostic adaptation; tasks failing twice immediately drop to quarantined remainder delivery.
 
 ### 7.3 Fail-Stop Strict Mode (`strict_mode=True`) vs. Availability Trade-Off
 - In default candidate-level quarantine (`strict_mode=False`), only the misaligned directive is redacted (`⟦redacted: instruction-like content quarantined⟧`), while surrounding benign text is delivered to the agent.

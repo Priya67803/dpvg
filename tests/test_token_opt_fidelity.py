@@ -67,7 +67,7 @@ def test_token_counter_source_reporting():
     assert source in {"tiktoken", "wordpiece", "approximate"}
 
     # Test Gateway records the active token counter source
-    gw = Gateway(backend="vulnerable")
+    gw = Gateway(backend="ollama")
     case = {
         "id": "t_pref_01",
         "query": "What is the capital of France?",

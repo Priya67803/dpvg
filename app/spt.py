@@ -12,6 +12,11 @@ def root_lineage(root_hash: str) -> str:
     return sha256(f"root:{root_hash}")
 
 
+def replan_root_lineage(root_hash: str, original_jti: str, nonce: str) -> str:
+    """Create a unique lineage hash for a re-plan root token, distinguished by original JTI and session nonce."""
+    return sha256(f"root:{root_hash}:replan:{original_jti}:{nonce}")
+
+
 def extend_lineage(parent: str, hop: str) -> str:
     return sha256(f"{parent}|{hop}")
 
@@ -33,13 +38,15 @@ class SPTEngine:
               agent: str, parent_jti: str | None = None, ttl: int | None = None,
               max_depth: int = config.MAX_DEPTH, session_id: str | None = None,
               read_only: bool = False, permissions: dict | None = None,
-              lineage_parent_jti: str | None = None, lineage_hop: str | None = None) -> tuple[str, dict]:
+              lineage_parent_jti: str | None = None, lineage_hop: str | None = None,
+              replan_of: str | None = None) -> tuple[str, dict]:
         now = int(time.time())
         claims = {
             "jti": uuid.uuid4().hex, "iss": self.issuer, "iat": now, "exp": now + (self.ttl if ttl is None else ttl),
             "root": root_hash, "lin": lineage, "par": parent_jti, "depth": depth, "agent": agent,
             "lin_par": lineage_parent_jti, "lin_hop": lineage_hop,
             "sid": session_id,
+            "replan_of": replan_of,
             "scope": {
                 "tools": sorted(set(tools)),
                 "agents": sorted(set(agents)),

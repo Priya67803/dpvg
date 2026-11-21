@@ -79,13 +79,11 @@ def modes():
 @app.get("/api/backends")
 def backends():
     return {
-        "default": config.BACKEND,
+        "default": "ollama",
         "available": [
-            {"key": "ollama", "label": "Ollama (local)"},
-            {"key": "vulnerable", "label": "Vulnerable baseline (deterministic)"},
-            {"key": "hosted", "label": "Hosted OpenAI-compatible API"},
+            {"key": "ollama", "label": "Ollama (llama3.2)"},
+            {"key": "compromised", "label": "Compromised Agent (follows injection)"},
         ],
-        "hosted_configured": bool(config.HOSTED_API_KEY and config.HOSTED_API_MODEL),
     }
 
 
@@ -122,13 +120,24 @@ def compare(body: dict = Body(...)):
     case.setdefault("is_attack", bool(case.get("injection") or case.get("rogue")))
     gw = _gw(body.get("tau"), body.get("backend"))
     out = []
+    is_attack = bool(case.get("is_attack"))
     for k in body.get("modes") or list(MODES):
         try:
             r = gw.run(case, k)
         except LLMError as e:
             raise HTTPException(502, str(e))
-        out.append({"mode": k, "label": MODES[k].label, **r["metrics"], "blocked_at": next(
-            (f"{c['stage']}:{c['code']}" for c in r["checks"] if not c["allowed"]), None)})
+        outcome = r.get("outcome", {})
+        injection_detected = any(c.get("stage") in ("rules", "sem", "action_class", "drift") and not c.get("allowed") for c in r.get("checks", [])) or (r.get("metrics", {}).get("detected") and is_attack)
+        attacker_goal_blocked = bool(is_attack and not r.get("metrics", {}).get("attack_success") and (injection_detected or any(not c.get("allowed") for c in r.get("checks", []))))
+        benign_blocked = bool(not is_attack and any(not c.get("allowed") for c in r.get("checks", [])))
+        out.append({
+            "mode": k, "label": MODES[k].label, **r["metrics"],
+            "outcome": outcome,
+            "injection_detected": injection_detected,
+            "attacker_goal_blocked": attacker_goal_blocked,
+            "benign_blocked": benign_blocked,
+            "blocked_at": next((f"{c['stage']}:{c['code']}" for c in r["checks"] if not c["allowed"]), None)
+        })
     return {"tau": gw.tau, "results": out}
 
 
@@ -136,7 +145,7 @@ def compare(body: dict = Body(...)):
 def results():
     """Stored real-data results written by scripts/evaluate.py (InjecAgent, AgentDojo, B1 sensitivity, prototype set)."""
     out = {}
-    for name in ("proto", "injecagent", "agentdojo", "spotlight", "token_opt"):
+    for name in ("proto", "injecagent", "agentdojo", "spotlight", "token_opt", "plan_gating_utility", "results", "latency_benchmark"):
         f = RESULTS / f"{name}.json"
         if f.exists():
             out[name] = json.loads(f.read_text())

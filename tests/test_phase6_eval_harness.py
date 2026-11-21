@@ -86,7 +86,7 @@ def test_drift_matrix_workload_uses_heldout_multistep_cases():
 
 def test_check_backend_available():
     """check_backend_available identifies availability without unhandled errors."""
-    avail, reason = check_backend_available("vulnerable")
+    avail, reason = check_backend_available("ollama")
     assert avail is True
     assert reason == "ok"
 
@@ -112,7 +112,7 @@ def test_load_workload_cases_and_skip():
 def test_evaluate_single_mode():
     """evaluate_single_mode evaluates cases and computes all required metrics."""
     from app.dataset import split_cases
-    gw = Gateway(backend="vulnerable")
+    gw = Gateway(backend="ollama")
     cases = split_cases("test")[:4]
 
     res = evaluate_single_mode(gw, "B0", cases)
@@ -142,7 +142,7 @@ def test_run_matrix_end_to_end(tmp_path):
 
     res = run_matrix(
         modes=["B0", "FULL"],
-        backends=["vulnerable"],
+        backends=["ollama"],
         workloads=["demo"],
         seeds=[17, 29],
         limit=4,
@@ -154,13 +154,13 @@ def test_run_matrix_end_to_end(tmp_path):
     assert out_file.exists()
     assert runs_dir.exists()
     run_files = list(runs_dir.glob("*.json"))
-    assert len(run_files) == 2  # 2 seeds for vulnerable demo
+    assert len(run_files) == 2  # 2 seeds for ollama demo
 
     # Check matrix structure
     assert "provenance" in res
     assert "workloads" in res
     assert "demo" in res["workloads"]
-    demo_vulnerable = res["workloads"]["demo"]["vulnerable"]
+    demo_vulnerable = res["workloads"]["demo"]["ollama"]
     assert "summary" in demo_vulnerable
     assert "B0" in demo_vulnerable["summary"]
     assert "FULL" in demo_vulnerable["summary"]
@@ -218,7 +218,7 @@ def test_generate_tables_only(tmp_path):
         "provenance": {"git_commit": "abc1234", "timestamp": "2026-11-17T00:00:00", "tau": 0.12},
         "workloads": {
             "demo": {
-                "vulnerable": {
+                "ollama": {
                     "summary": {
                         "B0": {
                             "asr": {"mean": 1.0, "std": 0.0},

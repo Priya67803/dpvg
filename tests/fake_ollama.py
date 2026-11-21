@@ -20,7 +20,8 @@ NEXT_AGENT_RE = re.compile(r"\b(?:next|downstream|following|receiving)\s+agent\b
 
 def infer_call(sentence: str):
     s = sentence.lower()
-    emails, money = EMAIL_RE.findall(sentence), AMOUNT_RE.search(sentence)
+    emails = [e.rstrip(".") for e in EMAIL_RE.findall(sentence)]
+    money = AMOUNT_RE.search(sentence)
     if re.search(r"\b(transfer|wire|remit|pay)\b", s) or (money and "send" in s):
         return "transfer_money", {"to": emails[0] if emails else "", "amount": money.group(1) if money else ""}
     if re.search(r"\b(delete|erase|wipe|remove)\b", s):

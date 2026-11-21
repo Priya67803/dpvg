@@ -20,7 +20,7 @@ from app.evaluation import evaluate_mode, sweep_candidate_tau
 from app.gateway import Gateway, MODES
 
 MODE_ORDER = list(MODES)
-DEFAULT_BACKENDS = ["vulnerable", "ollama", "hosted"]
+DEFAULT_BACKENDS = ["ollama"]
 DEFAULT_SEEDS = [17, 29, 43]
 METRICS = ["asr", "tcr", "precision", "recall", "f1", "fpr", "r_tok"]
 OUT = ROOT / "results"
@@ -158,7 +158,7 @@ def main() -> None:
     parser.add_argument("--datasets", nargs="+", choices=("adaptive", "injecagent", "proto"),
                         default=["adaptive", "injecagent"])
     parser.add_argument("--setting", choices=("base", "enhanced", "both"), default="both")
-    parser.add_argument("--backends", nargs="+", choices=("vulnerable", "ollama", "hosted"),
+    parser.add_argument("--backends", nargs="+", choices=("ollama",),
                         default=DEFAULT_BACKENDS)
     parser.add_argument("--modes", nargs="+", choices=MODE_ORDER, default=MODE_ORDER)
     parser.add_argument("--seeds", nargs="+", type=int, default=DEFAULT_SEEDS)

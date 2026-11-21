@@ -280,5 +280,10 @@
       "benign_tcr_not_worse_than_g_ab": true,
       "attack_tcr_not_worse_than_g_ab": true
     }
-  ]
+  ],
+  "model": "llama3.2",
+  "temperature": 0.7,
+  "seed": 42,
+  "embedder": "all-MiniLM-L6-v2",
+  "N": 200
 }

@@ -77,8 +77,14 @@ def spotlight(a):
 
 def agentdojo(a):
     t = time.time()
-    out = run_agentdojo(modes=a.modes, suites=a.suites, tau=a.tau, limit_user=a.limit_user, limit_inj=a.limit_inj,
-                        progress=lambda m, s, r: print(f"  [{m}] {s}: {r}", flush=True))
+    try:
+        out = run_agentdojo(modes=a.modes, suites=a.suites, tau=a.tau, limit_user=a.limit_user, limit_inj=a.limit_inj,
+                            progress=lambda m, s, r: print(f"  [{m}] {s}: {r}", flush=True))
+    except Exception as e:
+        print(f"AgentDojo evaluation skipped: {e}")
+        out = {"benchmark": "AgentDojo v1.2.1", "status": "skipped", "reason": str(e), "rows": []}
+        (OUT / "agentdojo.json").write_text(json.dumps(out, indent=2))
+        return
     print(f"\n== AgentDojo {out['benchmark']} ({out['embedder']}, tau={out['tau']}, {time.time() - t:.0f}s)")
     print(f"{'mode':7} {'ASR':>6} {'util':>6} {'util|atk':>9} {'clean flagged':>14} {'inj flagged':>12} {'p50 ms':>7}")
     for r in out["rows"]:

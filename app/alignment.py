@@ -133,7 +133,10 @@ def is_instruction(sentence: str) -> bool:
 def extract_candidates(text: str, strip_obfuscation: bool = True) -> list[str]:
     cleaned = NEUTRAL_RE.sub(" ", clean_text(text, strip_obfuscation=strip_obfuscation))
     segs = [_LEAD.sub("", x.strip(" \t'\"")).strip(" \t'\"") for x in _SPLIT.split(cleaned) if x]
-    return [x for x in segs if len(x) >= 8 and (len(x.split()) >= 3 or MARKERS.search(x) or OVERRIDE_REGEX.search(x)) and is_instruction(x)]
+    return [
+        x for x in segs
+        if len(x) >= 8 and (len(x.split()) >= 3 or MARKERS.search(x) or OVERRIDE_REGEX.search(x) or is_directive(x)) and (is_instruction(x) or is_directive(x))
+    ]
 
 
 _WORD = re.compile(r"[a-z0-9@.']+")
@@ -205,6 +208,80 @@ def sanitize(text: str, decisions: list[tuple[str, bool]]) -> str:
     return _sanitize_string_value(text, decisions)
 
 
+ACTION_CLASSES: dict[str, set[str]] = {
+    "read":    {"read", "reading", "list", "listing", "show", "showing", "summarize", "summarise", "summary", "summarizing", "get", "find", "search", "check", "inspect", "view", "fetch", "lookup", "display", "print", "tell", "query", "count", "verify", "examine", "look"},
+    "write":   {"send", "sending", "forward", "forwarding", "create", "creating", "reschedule", "update", "updating", "edit", "editing", "post", "posting", "append", "invite", "share", "sharing", "write", "writing", "draft", "add", "adding", "wire", "transfer", "pay", "upload", "uploading", "dispatch", "dispatching", "email", "mail", "submit", "deliver"},
+    "destroy": {"delete", "deleting", "deleted", "remove", "removing", "removed", "erase", "erasing", "erased", "cancel", "canceling", "cancelling", "canceled", "cancelled", "wipe", "wiping", "wiped", "drop", "dropping", "dropped", "clear", "clearing", "cleared", "purge", "purging", "purged", "revoke", "reset", "kill", "terminate", "withdraw", "destroy"},
+}
+
+
+def action_classes(text: str) -> set[str]:
+    """Identify action verb classes present in the text."""
+    if not text:
+        return set()
+    words = set(re.findall(r"\b[a-z]{3,}\b", text.lower()))
+    classes = {c for c, verbs in ACTION_CLASSES.items() if words & verbs}
+    # Check "schedule" as action verb: "schedule a meeting", "schedule sync" -> write
+    if re.search(r"\bschedule\s+(?:a|an|the|new|\d|meeting|sync|call|appointment)\b", text.lower()):
+        classes.add("write")
+    return classes
+
+
+def allowed_classes_for_request(user_request: str) -> set[str]:
+    """Extract authorized action classes from the user root request.
+    Informational/query-based requests with no explicit mutation verbs default to {'read'}.
+    """
+    classes = action_classes(user_request)
+    if not classes:
+        classes = {"read"}
+    return classes
+
+
+# Generalized directive patterns (Priority 2 Fix 5):
+# 1. Agent-addressed phrasing
+AGENT_ADDRESSED_RE = re.compile(
+    r"\b(?:(?:message|note|instruction|directive|request|notice)s?\s+(?:to|for)\s+(?:the\s+)?(?:downstream\s+|next\s+)?(?:agent|assistant|model|ai|bot)|"
+    r"(?:to|for)\s+(?:the\s+)?(?:downstream\s+|next\s+)?(?:agent|assistant|model|ai|bot)\s*[:,\-]?|"
+    r"(?:agent|assistant|model|ai|bot)\s*[,:]\s*(?:please|kindly|you\s+(?:must|should|need\s+to|have\s+to)|do\s+not|never|always|[a-z]{3,})|"
+    r"(?:attention|calling|dear|hey)\s+(?:agent|assistant|model|ai|bot)|"
+    r"(?:the\s+)?(?:agent|assistant|model|ai)\s+(?:must|should|is\s+instructed\s+to|is\s+required\s+to|needs\s+to)|"
+    r"(?:instructions?|guidelines?)\s+for\s+(?:the\s+)?(?:agent|assistant|model))\b",
+    re.I
+)
+
+# 2. Authority framing ("the user wants...", "per user instruction", "user requested", etc.)
+AUTHORITY_FRAMING_RE = re.compile(
+    r"\b(?:(?:the\s+)?user\s+(?:wants|desires|requests|requires|needs|instructs|asked|demands|said|prefers|has\s+(?:instructed|requested|ordered|demanded|asked))|"
+    r"(?:per|as\s+per|according\s+to)\s+(?:the\s+)?(?:user(?:'s)?|admin(?:'s)?|system)\s+(?:request|instruction|directive|demand|desire|wish|order)|"
+    r"(?:user|admin|administrator|developer|management)\s+(?:preference|instruction|directive|command|order|update)\s*:|"
+    r"(?:the\s+)?(?:admin|administrator|system|developer)\s+(?:wants|requires|instructs|demands|authorizes|mandates)|"
+    r"(?:the\s+)?user\s+(?:modified|updated|changed)\s+(?:their|the)\s+(?:request|task|instruction|mind)|"
+    r"(?:ensure\s+that|please\s+ensure|ensure\s+you|make\s+sure\s+(?:that|you)?))\b",
+    re.I
+)
+
+# 3. URLs in tool output
+TOOL_URL_RE = re.compile(r"(?:https?://|www\.)[^\s'\"<>\(\)\[\]\{\}]+", re.I)
+
+
+def is_directive(span: str) -> bool:
+    """Generalize directive detection to cover:
+    1. Standard imperatives and override markers (is_instruction)
+    2. Agent-addressed phrasing (AGENT_ADDRESSED_RE)
+    3. Authority framing ("the user wants...", etc.) (AUTHORITY_FRAMING_RE)
+    4. External URLs in tool output combined with action verbs (TOOL_URL_RE)
+    """
+    if not span or not span.strip():
+        return False
+    s = span.strip()
+    return bool(
+        is_instruction(s)
+        or AGENT_ADDRESSED_RE.search(s)
+        or AUTHORITY_FRAMING_RE.search(s)
+        or (TOOL_URL_RE.search(s) and (action_classes(s) or bool(IMPER.match(s))))
+    )
+
+
 class AlignmentEngine:
     def __init__(self, embedder) -> None:
         self.embedder = embedder
@@ -213,28 +290,87 @@ class AlignmentEngine:
         return cosine(self.embedder.encode(text), e_root)          # Eq. (1)
 
     def check_payload(self, e_root, text: str, tau: float,
-                      enable_rules: bool = True, enable_sem: bool = True) -> dict:
+                      enable_rules: bool = True, enable_sem: bool = True,
+                      root_text: str = "") -> dict:
         candidates = extract_candidates(text, strip_obfuscation=enable_rules)
+        if not candidates and text.strip():
+            text_classes = action_classes(text)
+            if text_classes:
+                candidates = [text.strip()]
+        root_allowed = allowed_classes_for_request(root_text) if root_text else {"read"}
         cands = []
         for candidate in candidates:
             score = round(self.score(e_root, candidate), 4) if enable_sem else None
             marker_detected = has_high_confidence_injection_marker(candidate) if enable_rules else False
+            cand_classes = action_classes(candidate)
+
+            # Fix 4: action-class check. An in-domain directive whose verb class escalates privileges
+            # (e.g. 'delete' in a 'list/read' intent) is blocked regardless of semantic topical similarity.
+            # root.allowed = classes(user_request)            # {"read"}
+            # if is_directive(span) and not classes(span) <= root.allowed:
+            #     return Block("action-class escalation")
+            cand_is_directive = is_directive(candidate)
+            action_class_escalation = bool(
+                cand_is_directive and cand_classes and not (cand_classes <= root_allowed)
+            )
 
             allowed = True
-            cand_blocked_by = None
+            cand_blocked_layers = []
+            cand_rules = []
+            cand_reason = "aligned"
+
+            # 1. Hidden comment or zero-width character rule
+            has_hidden = bool(has_hidden_content(candidate) or COMMENT_RE.search(candidate) or ZW_RE.search(candidate))
+            if enable_rules and has_hidden:
+                allowed = False
+                cand_blocked_layers.append("rules")
+                cand_rules.append("hidden-comment rule" if COMMENT_RE.search(candidate) else "zero-width rule")
+                cand_reason = "hidden comment or invisible characters detected"
+
+            # 2. Exfiltration and prompt injection marker rules
             if enable_rules and marker_detected:
                 allowed = False
-                cand_blocked_by = "rules"
-            elif enable_sem and score is not None and score < tau:
+                cand_blocked_layers.append("rules")
+                is_exfil = bool(re.search(r"\b(?:transfer|send|wire|pay|exfiltrat|leak)\b", candidate, re.I) and
+                               re.search(r"(?:@|https?://|\$|\b(?:account|bank|wallet)\b)", candidate, re.I))
+                if is_exfil:
+                    cand_rules.append("exfiltration rule")
+                    cand_reason = "unauthorized exfiltration or transfer directive detected"
+                elif re.search(r"\b(?:ignore|disregard|system|assistant|admin)\b", candidate, re.I):
+                    cand_rules.append("override marker rule")
+                    cand_reason = "instruction override marker detected"
+                else:
+                    cand_rules.append("prompt injection rule")
+                    cand_reason = "high confidence prompt injection marker detected"
+
+            # 3. Action-class escalation check
+            if enable_sem and action_class_escalation:
                 allowed = False
-                cand_blocked_by = "sem"
+                cand_blocked_layers.append("action_class")
+                esc_detail = f"action-class escalation ({','.join(sorted(cand_classes))} vs {','.join(sorted(root_allowed))})"
+                cand_rules.append(esc_detail)
+                cand_reason = f"action-class escalation: candidate classes {sorted(cand_classes)} exceed root classes {sorted(root_allowed)}"
+
+            # 4. Semantic similarity check
+            if enable_sem and score is not None and score < tau:
+                allowed = False
+                cand_blocked_layers.append("sem")
+                sim_detail = f"similarity (score {score:.3f} < τ {tau:.2f})"
+                cand_rules.append(sim_detail)
+                cand_reason = f"semantic similarity {score} below alignment threshold tau {tau}"
+
+            cand_blocked_by = ", ".join(cand_rules) if cand_rules else ("aligned" if allowed else "rules")
 
             cands.append({
                 "text": candidate,
                 "score": score,
                 "marker_detected": marker_detected,
+                "action_classes": sorted(cand_classes),
+                "action_class_escalation": action_class_escalation,
                 "allowed": allowed,
                 "blocked_by": cand_blocked_by,
+                "blocked_layers": cand_blocked_layers,
+                "reason": cand_reason,
             })
 
         # Check whole-payload marker if rules enabled but no candidates triggered it
@@ -244,8 +380,11 @@ class AlignmentEngine:
                 "text": text.strip()[:120],
                 "score": round(self.score(e_root, text.strip()[:120]), 4) if enable_sem else None,
                 "marker_detected": True,
+                "action_classes": sorted(action_classes(text)),
+                "action_class_escalation": False,
                 "allowed": False,
                 "blocked_by": "rules",
+                "reason": "payload-level injection pattern matched",
             })
 
         scores = [c["score"] for c in cands if c["score"] is not None]
@@ -254,11 +393,12 @@ class AlignmentEngine:
         marker_count = sum(c["marker_detected"] for c in cands)
 
         blocked_layers = []
-        if any(c.get("blocked_by") == "rules" for c in cands):
-            blocked_layers.append("rules")
-        if any(c.get("blocked_by") == "sem" for c in cands):
-            blocked_layers.append("sem")
-        blocked_by = "+".join(blocked_layers) if blocked_layers else None
+        for c in cands:
+            cb = c.get("blocked_by") or ""
+            for layer in ("rules", "action_class", "sem"):
+                if layer in cb and layer not in blocked_layers:
+                    blocked_layers.append(layer)
+        blocked_by = "+".join(blocked_layers) if blocked_layers else ("rules" if blocked else None)
 
         return {
             "candidates": cands,

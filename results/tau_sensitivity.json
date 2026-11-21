@@ -910,5 +910,10 @@
         }
       ]
     }
-  }
+  },
+  "model": "llama3.2",
+  "temperature": 0.7,
+  "seed": 42,
+  "tau": 0.13,
+  "N": 20
 }

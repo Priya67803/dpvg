@@ -7,7 +7,7 @@ from app.agents import AGENTS, AgentSpec, ProposedAction, get_role_backend
 from app.dataplane import ALL_TOOLS
 from app.evaluation import evaluate_plan_gating_utility, evaluate_planner_reliability
 from app.gateway import Gateway
-from app.llm_backends import VulnerableBackend, TOOL_SPECS
+from app.llm_backends import OllamaBackend, TOOL_SPECS
 from app.orchestrator import SubTask
 
 
@@ -131,7 +131,7 @@ def test_llm_planner_raises_when_fallback_disabled():
 
 def test_search_web_request_yields_no_send_email_in_scope():
     """A 'search the web' request yields ONLY search_web in scope, never send_email."""
-    backend = VulnerableBackend()
+    backend = OllamaBackend()
     gw = Gateway(llm=backend, planner_type="llm")
 
     case = {
@@ -250,28 +250,28 @@ def test_per_role_backend_overrides_via_config():
 
 def test_per_role_backend_overrides_via_env_vars(monkeypatch):
     """Per-role backends resolve via DPVG_BACKEND_<ROLE> environment variables."""
-    monkeypatch.setenv("DPVG_BACKEND", "vulnerable")
-    monkeypatch.setenv("DPVG_BACKEND_PLANNER", "vulnerable")
-    monkeypatch.setenv("DPVG_BACKEND_TOOL", "vulnerable")
-    monkeypatch.setenv("DPVG_BACKEND_REASONING", "vulnerable")
-    monkeypatch.setenv("DPVG_BACKEND_SPECIALIZED", "vulnerable")
+    monkeypatch.setenv("DPVG_BACKEND", "ollama")
+    monkeypatch.setenv("DPVG_BACKEND_PLANNER", "ollama")
+    monkeypatch.setenv("DPVG_BACKEND_TOOL", "ollama")
+    monkeypatch.setenv("DPVG_BACKEND_REASONING", "ollama")
+    monkeypatch.setenv("DPVG_BACKEND_SPECIALIZED", "ollama")
 
     planner_b = get_role_backend("planner")
-    assert planner_b.name == "vulnerable"
+    assert planner_b.name == "ollama"
 
     tool_b = get_role_backend("tool")
-    assert tool_b.name == "vulnerable"
+    assert tool_b.name == "ollama"
 
     reasoning_b = get_role_backend("reasoning")
-    assert reasoning_b.name == "vulnerable"
+    assert reasoning_b.name == "ollama"
 
     spec_b = get_role_backend("specialized")
-    assert spec_b.name == "vulnerable"
+    assert spec_b.name == "ollama"
 
 
 def test_role_backends_default_to_shared_backend():
     """When role overrides are not specified, all roles default to the shared backend."""
-    shared = VulnerableBackend()
+    shared = OllamaBackend()
     gw = Gateway(llm=shared)
 
     assert gw.role_llms["planner"] is shared
@@ -408,9 +408,9 @@ def test_planner_never_receives_tool_output():
         planner_type="llm",
         role_backends={
             "planner": planner_backend,
-            "tool": VulnerableBackend(),
-            "reasoning": VulnerableBackend(),
-            "specialized": VulnerableBackend(),
+            "tool": OllamaBackend(),
+            "reasoning": OllamaBackend(),
+            "specialized": OllamaBackend(),
         },
     )
 

@@ -62,7 +62,11 @@ class CryptoValidator:
         if rec.lineage_parent != lineage_parent_jti or rec.lineage_hop != lineage_hop:
             return StageAResult(False, "lineage", "lineage parent or hop differs from the control-plane record", claims)
         if lineage_parent_jti is None:
-            if lineage_hop is not None or rec.lineage != root_lineage(session.root_hash):
+            replan_of = claims.get("replan_of")
+            if replan_of:
+                if lineage_hop is not None:
+                    return StageAResult(False, "lineage", "re-plan root token has an invalid lineage hop", claims)
+            elif lineage_hop is not None or rec.lineage != root_lineage(session.root_hash):
                 return StageAResult(False, "lineage", "root token has an invalid lineage hash", claims)
         else:
             lineage_parent = self.registry.lineage.get(lineage_parent_jti)

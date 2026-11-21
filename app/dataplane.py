@@ -8,6 +8,7 @@ DEFAULT_DATA = {
     "get_calendar": "09:00 Standup. 11:00 Design review with Maya. 15:00 Vendor call with Acme.",
     "read_file": "Q3 revenue grew 12% year over year to $4.2M. Operating margin improved to 18%. Headcount stayed flat.",
     "search_web": "Top results: independent reviews, price comparisons and buyer guides published this month.",
+    "fetch_url": "Remote URL content successfully fetched.",
 }
 from .config import READ_ONLY_TOOLS, SIDE_EFFECT_TOOLS, ALL_CATALOG_TOOLS
 
@@ -48,12 +49,26 @@ class ToolResult:
 class DataPlane:
     def __init__(self) -> None:
         self.ledger: list[dict] = []     # every executed call (ground truth for ASR)
+        self._cache: dict[tuple, ToolResult] = {}  # idempotency cache to prevent duplicate executions
 
-    def call(self, tool: str, args: dict, spt_id: str, fixture: str | None = None, malicious: bool = False) -> ToolResult:
+    def call(self, tool: str, args: dict, spt_id: str, fixture: str | None = None,
+             malicious: bool = False, origin: str = "user_plan", subtask_id: int | None = None) -> ToolResult:
         if tool not in ALL_TOOLS:
             raise ValueError(f"unknown tool {tool}")
+
+        # Idempotency: avoid redundant execution of identical tool call for the same subtask
+        import json
+        args_key = json.dumps(args or {}, sort_keys=True)
+        key = (tool, args_key, subtask_id)
+        if subtask_id is not None and key in self._cache:
+            return self._cache[key]
+
         side = tool in SIDE_EFFECT_TOOLS
         content = f"OK: {tool} executed (simulated)" if side else (fixture if fixture is not None else DEFAULT_DATA.get(tool, ""))
+        res = ToolResult(tool, content, f"sandbox://{tool}", time.time(), spt_id, side)
+        if subtask_id is not None:
+            self._cache[key] = res
+
         self.ledger.append({"tool": tool, "args": args, "spt_id": spt_id, "malicious": malicious,
-                            "side_effect": side, "ts": time.time()})
-        return ToolResult(tool, content, f"sandbox://{tool}", time.time(), spt_id, side)
+                            "side_effect": side, "origin": origin, "subtask_id": subtask_id, "ts": time.time()})
+        return res

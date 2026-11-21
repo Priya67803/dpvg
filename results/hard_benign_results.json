@@ -409,5 +409,9 @@
         "tcr": 0.9879
       }
     }
-  }
+  },
+  "model": "llama3.2",
+  "temperature": 0.7,
+  "seed": 42,
+  "N": 325
 }

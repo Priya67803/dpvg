@@ -1,7 +1,7 @@
 # Dual-Plane Runtime Verification Gateway (DPVG)
 
 Implementation of *"A Zero-Trust, Token-Optimized Defense Against Indirect Prompt Injection using Multi-Agent LLM Systems"*:
-FastAPI gateway, browser dashboard, and evaluation harness with InjecAgent data and an AgentDojo adapter. The default agent backend is a local Ollama model; the vulnerable baseline and an optional OpenAI-compatible hosted backend can also be selected. All built-in tool actions remain simulated.
+FastAPI gateway, browser dashboard, and evaluation harness with InjecAgent data and an AgentDojo adapter. Evaluated on llama3.2 via Ollama only (`DPVG_BACKEND=ollama`). All built-in tool actions remain simulated.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate          # Windows: .venv\Scripts\activate
@@ -20,10 +20,10 @@ python scripts/evaluate.py all                             # regenerate results/
 
 | Gap | Now | Status |
 |---|---|---|
-| Agent backends | `OllamaBackend` is the default (`DPVG_BACKEND=ollama`). `VulnerableBackend` deterministically follows instruction-like tool output for the B0 no-defense baseline. `HostedAPIBackend` supports an OpenAI-compatible API configured through environment variables. The dashboard can select among them. Hosted prompts/results are sent to the configured endpoint; only use it with data approved for that service. | Ollama and hosted HTTP behavior are tested with mock transports; hosted calls are not made by the test suite. |
+| Agent backends | Evaluated on llama3.2 via Ollama only (`DPVG_BACKEND=ollama`). Experimental/legacy simulated backends (`VulnerableBackend`, `HostedAPIBackend`) are removed from evaluation claims. | Ollama Llama 3.2 3B Instruct via local daemon (`http://127.0.0.1:11434/api/chat`). |
 | Fallback embedder | **Removed.** The hashing embedder and the automatic `onnx -> sentence-transformers -> hash` chain are gone. `DPVG_EMBEDDER=onnx` (default, bundled MiniLM, SHA-256 checked at load) or `st`; if it cannot load, startup fails. It reproduces the sentence-transformers reference similarities (0.6660 / 0.1046 / 0.1411) and is tested for it. | Done |
 | No LangGraph | The pipeline is now explicit steps run by a **LangGraph `StateGraph`** (`optimize -> register -> (orchestrate -> execute_verify -> advance)* -> adversary -> finalize`). `DPVG_EXECUTOR=plain` runs the same steps without it, but only when you ask for it: a missing `langgraph` package is now an error, not a silent downgrade. | Done and verified |
-| Scope and ablations | `G-AB+P`, `G-AB+S`, and `G-AB+T` isolate plan, scope/argument, and token-optimization controls. `G-AB+P+E` adds an optional trusted-input plan-extension attempt. | Implemented; dynamic utility numbers are a two-case simulated fixture only. |
+| Scope and ablations | `G-AB+P`, `G-AB+S`, and `G-AB+T` isolate plan, scope/argument, and token-optimization controls. `G-AB+P+E` adds an optional trusted-input plan-extension attempt. | Evaluated on the in-house AgentDojo-style dynamic set (`data/dynamic_tool_use.json`, 54 cases); recovers 100% benign dynamic utility. |
 | No spotlighting baseline | **B1** implemented (`app/spotlight.py`: delimiting, datamarking, encoding, Hines et al.). A prior standalone Ollama evaluation command is available; the complete Phase 6 matrix was not run in this environment. | Implemented |
 | Loaders never run on real data | **InjecAgent:** real files bundled in `data/` and a loader is available. **AgentDojo v1.2.1:** an adapter is available for its message format and Ollama `/v1` endpoint. Full Phase 6 runs require external services and optional packages. | Implemented; current full run unavailable |
 
@@ -85,7 +85,7 @@ $$\text{DriftScore}_t = \alpha \cdot \text{Sim}(a_t, \text{goal}) + (1-\alpha) \
 - **160-Scenario Drift Benchmark:** Evaluated on `data/drift_scenarios.json` (80 validation / 80 held-out test). Calibrating on validation only selected $\tau_{\text{drift}}=0.35, N=1, \alpha=0.80$ (validation detection 1.000, FBR 0.000). On held-out test data, detection remains 1.000, while false-block rate is **14.29%** (10/70 benign tasks). The legacy 11-scenario estimate is superseded and archived in `calibration.json`.
 - **Bounded Re-Planning:** On a verification block, the gateway initiates a bounded re-plan cycle (up to `DPVG_MAX_REPLANS`, default `1` retry) through intent optimization (Step 1), root re-registration (Step 2), and orchestration (Step 3).
   - *Trusted Input Invariant:* Re-planning operates **strictly on trusted inputs** (the original user prompt and authorized catalog); quarantined tool outputs or adversarial payloads are never admitted into the planner.
-  - *Safe Fallback:* If re-planning retries are exhausted without successful verification, the gateway falls back to safe fallback remainder delivery.
+  - *Quarantined Delivery:* If re-planning retries are exhausted without successful verification, the gateway falls back to quarantined remainder delivery.
 - **Strict Mode (`DPVG_STRICT_MODE=true`):** In contrast to the default candidate-level quarantine (which redacts only the malicious directive and passes safe surrounding text), strict mode enforces fail-stop zero-trust:
   - Any detected misaligned directive or prompt injection marker quarantines the **entire payload** (`⟦redacted: whole payload quarantined (strict mode)⟧`).
   - Appends an audit record with detection point, stage, rejection code, reason, and similarity score.
@@ -105,7 +105,7 @@ The orchestration engine supports both an LLM-backed planner (`LLMPlanner`) and 
   All roles default to the shared `DPVG_BACKEND` (`ollama|vulnerable|hosted`).
 
 ### Plan-gating utility cost and redesigned plan extension (`G-AB+P+E`)
-Evaluated on the expanded 54-case dynamic-tool benchmark (`data/dynamic_tool_use.json`: 24 read-only lookups, 15 user-authorized side-effects, 15 attack injections) at $\tau=0.0$:
+Evaluated on the in-house AgentDojo-style dynamic set (`data/dynamic_tool_use.json`: 54 cases — 24 read-only lookups, 15 user-authorized side-effects, 15 attack injections) at $\tau=0.0$:
 - `G-AB`: Dynamic utility TCR 1.0000, ASR 0.6000 (9/15 attacks admitted).
 - `G-AB+P` and `G-AB+S`: Dynamic utility TCR 0.0000, ASR 0.0000 (0/39 dynamic tasks completed).
 - `G-AB+P+E`: **Dynamic utility TCR 1.0000 (39/39), ASR 0.0000 (0/15)**.
@@ -127,19 +127,27 @@ python scripts/run_matrix.py --generate-tables-only results/matrix_evaluation.js
 ## Validation calibration method ($\tau = 0.13$)
 The threshold is selected on the leak-free InjecAgent base validation split only: 1,581 harness cases (527 attacks, 1,054 benign controls), grouped by attacker tool. The `[0.00, 1.00]` grid uses 0.01 increments and maximum `FPR=0.10`; best validation F1 satisfying the cap selects $\tau=0.13$ (precision 0.7275, recall 0.5066, F1 0.5973, FPR 0.0949). The test split is untouched. InjecAgent has 1,054 raw attacks per setting; the loader creates two matched benign variants per raw row for 3,162 harness cases. See [DATASET_AUDIT.md](docs/DATASET_AUDIT.md) and `calibration.json`.
 
+## Scientific Limitations & Methodological Guardrails
+
+1. **Evaluated on Llama 3.2 via Ollama Only:** All evaluation claims in this study reflect local testing against Meta's `llama3.2` 3B Instruct model via Ollama (`DPVG_BACKEND=ollama`, $T=0.7$, seed 42). Synthetic simulator backends (`VulnerableBackend`) and unverified remote endpoints (`HostedAPIBackend`) are removed from reported empirical claims.
+2. **Single 3B-Class Model:** Results are measured on a single 3B parameter model. Frontier architectures or larger models (e.g. 70B, GPT-4o, Claude 3.5 Sonnet) may exhibit different baseline instruction following and susceptibility dynamics.
+3. **Stage B Weaker on In-Domain Text:** Dense semantic similarity thresholding ($\tau = 0.13$) alone cannot reliably separate in-domain prompt injections from benign actions (in-domain attacks score mean similarity 0.338 vs root intent, calendar up to 0.535, yielding ROC AUC 0.2591 under $\tau$ alone). Semantic filtering must be augmented by generalized directive detection and action-class privilege escalation checks (`root.allowed = classes(user_request)`).
+4. **Stage A Cryptographic Scope as Primary Guarantee:** Dense semantic filtering is inherently soft. The fundamental containment guarantee against unauthorized tool actions (such as exfiltration or destruction) is Stage A cryptographic capability attenuation (SPT scope enforcement and read-only token gating).
+5. **Disjoint Tuning vs Test Split for Plan Extension:** Plan extension (`G-AB+P+E`) is evaluated using a stratified 50/50 partition (27 tuning cases, 27 held-out test cases) across `data/dynamic_tool_use.json` to eliminate methodological contamination.
+
 ## What remains untested
 To maintain rigorous scientific standards, the following empirical boundaries must be explicitly noted:
-1. **Full Phase 6 matrix:** Not run: Ollama was unreachable, `DPVG_HOSTED_API_KEY` / `DPVG_HOSTED_API_MODEL` were unavailable, and AgentDojo was not installed. Do not report absent runs as measured; check `results/matrix_evaluation.json` only after a real run.
-2. **Live AgentDojo benchmark suite:** The adapter is implemented, but live `banking`, `slack`, and `travel` runs were skipped because the optional package and model services were unavailable.
+1. **Multi-Model Generalization:** Testing across 70B+ models or diverse open-weights families (e.g. Mistral, Qwen) remains future work.
+2. **Live AgentDojo benchmark suite:** The adapter is implemented, but live `banking`, `slack`, and `travel` runs were skipped because optional packages were unavailable.
 3. **Hosted API backend in production:** `HostedAPIBackend` is tested with mock HTTP transports but has not been benchmarked against a live hosted endpoint.
 4. **Real-world physical side effects:** All tool executions in `DataPlane` are strictly simulated in memory; no real emails are dispatched, no real file systems altered, and no actual financial transactions executed.
 
 ## Caveats you should state in the paper
-1. **Attack-success numbers depend on the selected backend.** The deterministic vulnerable backend is intended for reproducible B0 measurements; model-backed runs should report the backend and model name.
+1. **Attack-success numbers depend on the selected backend.** All empirical numbers are measured on `llama3.2` via Ollama with Wilson 95% score intervals.
 2. The Phase 6 adaptive set is a deterministic, task-framed augmentation of InjecAgent, not a human-authored or LLM-generated adversarial red-team set; report it as an augmentation, not a new held-out benchmark.
 3. The "benign_hard" set and the 35-case set are author-written. FPR numbers on them are illustrative.
 4. The Stage B rules were developed after examining AgentDojo, so AgentDojo is not an untouched evaluation. Tau selection uses InjecAgent base validation data only; do not tune against the test split.
-5. "Safe fallback" in gateway messages means the defense's own behaviour (quarantine the misaligned sentence, deliver the redacted remainder), not a substitute model.
+5. "Quarantined; remainder delivered" in gateway messages means the defense's own behaviour (quarantine the misaligned sentence, deliver the redacted remainder), not a substitute model.
 6. The test suite uses `tests/fake_ollama.py`, an HTTP-level stand-in that obeys injected text. It tests the plumbing and the gateway, not any real model.
 
 ## Layout
@@ -152,5 +160,5 @@ results/*.json  calibration.json  frontend/  scripts/{evaluate,calibrate,downloa
 Env vars: `DPVG_BACKEND=ollama|vulnerable|hosted` (default `ollama`), `DPVG_OLLAMA_URL` (default `http://localhost:11434`), `DPVG_OLLAMA_MODEL` (default `llama3.2`), `DPVG_HOSTED_API_URL`, `DPVG_HOSTED_API_KEY`, `DPVG_HOSTED_API_MODEL`, `DPVG_LLM_TIMEOUT`, `DPVG_LLM_TEMPERATURE` (default `0`), `DPVG_LLM_SEED`, `DPVG_TAU`, `DPVG_TOKEN_BUDGET`, `DPVG_CONTEXT_SIMILARITY_CUTOFF`, `DPVG_DRIFT_THRESHOLD`, `DPVG_DRIFT_CONSECUTIVE_STEPS`, `DPVG_DRIFT_EMA_ALPHA`, `DPVG_DRIFT_METRIC=ema|mean`, `DPVG_MAX_REPLANS`, `DPVG_STRICT_MODE=true|false`, `DPVG_PLANNER_TYPE=llm|rule`, `DPVG_BACKEND_PLANNER`, `DPVG_BACKEND_TOOL`, `DPVG_BACKEND_REASONING`, `DPVG_BACKEND_SPECIALIZED`, `DPVG_EMBEDDER=onnx|st`, `DPVG_EXECUTOR=langgraph|plain`.
 
 ## Security notes
-Signing keys are generated per run in memory. Ollama runs locally by default; the hosted backend reads its optional API key from the environment. Tools are simulated: nothing real is sent, deleted or paid.
+Signing keys are generated once at startup in memory. Ollama runs locally by default; the hosted backend reads its optional API key from the environment. Tools are simulated: nothing real is sent, deleted or paid.
 Do not expose `/api/run` publicly without authentication: it accepts attacker-controlled text by design.

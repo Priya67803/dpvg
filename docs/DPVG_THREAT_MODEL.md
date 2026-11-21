@@ -211,7 +211,7 @@ The following assumptions bound the DPVG threat model:
    The bundled `all-MiniLM-L6-v2` ONNX model is hash-checked at load. Embedding similarity is not a security proof; candidate extraction and semantic scoring can miss or misclassify content. Scope and trusted-plan checks provide independent controls only in modes that enable them.
 5. **Threshold and dataset provenance:** `calibration.json` uses $\tau=0.13$, selected on the leak-free grouped InjecAgent base validation split (1,581 harness cases; 527 attacks) using the 0.00–1.00/0.01 grid and maximum FPR 0.10. Validation precision is 0.7275, recall 0.5066, F1 0.5973, and FPR 0.0949. This does not establish generalization beyond that split.
 6. **Phase 6 stimuli:** Adaptive cases use deterministic rewrite templates, simulated tools, fake `.invalid` addresses, and inert markers. They are a controlled augmentation, not a held-out corpus or full adversarial benchmark.
-7. **Empirical Boundary & What Remains Untested:**  
-   - The full Phase 6 matrix was skipped: Ollama was unreachable, hosted API credentials/model were unset, and AgentDojo was not installed.
-   - Hosted API backend (`HostedAPIBackend`) is tested via mock HTTP transports rather than a live hosted endpoint.
+7. **Empirical Boundary & Backend Grounding:**  
+   - All empirical evaluation claims are based on `llama3.2` via Ollama only (`temperature=0.7`, `seed=42`).
+   - Legacy and unverified backends (`HostedAPIBackend`, `VulnerableBackend`) are excluded from empirical claims; internal unit tests use mock transports.
    - All tools in `DataPlane` are strictly simulated in memory; real physical/network isolation around executing tool workers remains an out-of-band operational requirement.

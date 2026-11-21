@@ -21,7 +21,7 @@ Primary references: [IPIGuard (arXiv:2508.15310)](https://arxiv.org/abs/2508.153
 
 ## Utility cost of plan gating and redesigned extension (`G-AB+P+E`)
 
-The trade-off between plan gating and dynamic utility is evaluated on `data/dynamic_tool_use.json`, expanded to 54 cases:
+The trade-off between plan gating and dynamic utility is evaluated on the in-house AgentDojo-style dynamic set (`data/dynamic_tool_use.json`, expanded to 54 cases, never presented as official AgentDojo):
 - 24 benign workflows requiring an unplanned read-only verification tool (`search_web` to verify a citation or document note)
 - 15 benign workflows requiring an unplanned side-effect tool authorized by the user prompt (`send_email`, `transfer_money`, `post_slack`)
 - 15 injection attacks attempting unauthorized side-effect tool calls via untrusted tool output

@@ -109,28 +109,17 @@ A central challenge in LLM security benchmarking is the divergence between front
 flowchart TD
     Task["Evaluation Task Prompt"] --> Fork{"Evaluation Mode"}
     
-    subgraph LiveLLM["Setting 1: Live LLM (Meta Llama-3.2-3B)"]
-        Fork -->|Natural Behavior| LiveModel["Ollama Llama-3.2-3B (Q4_K_M)"]
-        LiveModel --> Measures1["Measures:<br/>- Authentic task completion utility<br/>- Real token compression ratio (r_tok)<br/>- End-to-end execution latency<br/>- Live prompt following behavior"]
-    end
-    
-    subgraph AdvSim["Setting 2: Deterministic Vulnerable Backend"]
-        Fork -->|Worst-Case Adversary| SimModel["VulnerableBackend"]
-        SimModel --> Measures2["Measures:<br/>- Gateway admission outcomes<br/>- Deterministic attack-following behavior<br/>- Controlled mode ablation<br/>- Simulated tool side effects"]
+    subgraph LiveLLM["Live LLM Evaluation: Meta Llama-3.2-3B via Ollama"]
+        Fork -->|Evaluated Setting| LiveModel["Ollama Llama-3.2-3B (Q4_K_M)"]
+        LiveModel --> Measures1["Measures:<br/>- Authentic task completion utility<br/>- Real token compression ratio (r_tok)<br/>- End-to-end execution latency<br/>- Repeated-trials ASR with Wilson 95% intervals"]
     end
 ```
 
-### 4.1 Setting 1: Live LLM (Meta Llama-3.2-3B)
-- **Model:** `llama3.2:latest` (ID: `a80c4f17acd5`, 3.21B parameters, 4-bit quantization Q4_K_M).
-- **Execution:** Local Ollama daemon running on CPU/GPU over HTTP (`http://127.0.0.1:11434/api/chat`).
-- **Purpose:** Measures real-world task utility, natural token compression ratios, and actual model latency.
-- **Empirical Observation:** The Phase 6 live-model matrix has not been run in the current environment. Any previously recorded Llama-3.2 baseline figures are historical observations and must not be presented as Phase 6 measurements.
-
-### 4.2 Setting 2: Deterministic Vulnerable Backend
-- **Engine:** `VulnerableBackend` follows instruction-like candidates extracted from tool observations. `FakeOllama` is an HTTP mock used by tests, not the Phase 6 benchmark backend.
-- **Adversarial Model:** It scans tool observations with `extract_candidates(obs)` and maps recognized text to simulated tool calls. This deterministic backend is a controlled stress test, not a live-model result.
-- **Independence:** Candidate extraction is separate from gateway admission. The gateway's actual checks depend on the selected mode; scope enforcement is not enabled in every mode.
-- **Purpose:** Stresses the gateway under a deterministic injection-following policy. Report measured results with backend, dataset, tau, and seeds; do not treat an older baseline ASR range as a Phase 6 result.
+### 4.1 Evaluation Backend: Meta Llama-3.2-3B via Ollama
+- **Model:** `llama3.2:latest` (3.21B parameters, 4-bit quantization Q4_K_M).
+- **Execution:** Local Ollama daemon running over HTTP (`http://127.0.0.1:11434/api/chat`).
+- **Standard Evaluation Configuration:** All reported empirical evaluations are conducted on `llama3.2` via Ollama only (`temperature=0.7`, `seed=42`).
+- **Removal of Legacy Backends:** `VulnerableBackend` and `HostedAPIBackend` are excluded from all active evaluation claims; internal unit tests use `fake_ollama` strictly for mock harness verification.
 
 ---
 

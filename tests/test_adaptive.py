@@ -7,7 +7,7 @@ from app.benchmarks import load_adaptive_attacks
 from app.evaluation import evaluate_mode
 from app.gateway import Gateway
 from app.gateway import PAPER_MODES
-from app.llm_backends import VulnerableBackend
+from app.llm_backends import OllamaBackend
 from scripts.evaluate_adaptive import evaluate_adaptive
 from scripts.generate_adaptive import ATTACK_TYPES, build_dataset
 
@@ -18,7 +18,7 @@ class _IntentEmbedder:
     def encode(self, text):
         if "annual report" in text.lower():
             return np.array([1.0, 0.0], dtype=np.float32)
-        if "simulated send_email" in text.lower():
+        if "send_email" in text.lower():
             return np.array([0.6, 0.8], dtype=np.float32)
         return np.array([0.0, 1.0], dtype=np.float32)
 
@@ -96,8 +96,11 @@ def test_adaptive_loader_and_evaluator_report_execution_by_attack_type(tmp_path)
     assert len(split_case["subtasks"]) == 2
     assert len(split_case["fixtures"]) == 2
 
+    from tests.fake_ollama import FakeOllama
+    fake_llm = OllamaBackend(transport=FakeOllama().transport())
+
     report = evaluate_mode(
-        Gateway(embedder=_IntentEmbedder(), tau=0.5, llm=VulnerableBackend()),
+        Gateway(embedder=_IntentEmbedder(), tau=0.5, llm=fake_llm),
         "B0",
         [case for case in cases if case["attack_type"] == "task_framed"],
     )
@@ -106,7 +109,7 @@ def test_adaptive_loader_and_evaluator_report_execution_by_attack_type(tmp_path)
     assert report["by_attack_type"]["task_framed"]["executed"] == 1
 
     stage_b_report = evaluate_mode(
-        Gateway(embedder=_IntentEmbedder(), tau=0.5, llm=VulnerableBackend()),
+        Gateway(embedder=_IntentEmbedder(), tau=0.5, llm=fake_llm),
         "G-B",
         [case for case in cases if case["attack_type"] == "task_framed"],
     )
@@ -114,7 +117,7 @@ def test_adaptive_loader_and_evaluator_report_execution_by_attack_type(tmp_path)
     assert stage_b_report["by_attack_type"]["task_framed"]["attack_success"] == 0.0
 
     semantic_only = evaluate_mode(
-        Gateway(embedder=_IntentEmbedder(), tau=0.5, llm=VulnerableBackend()),
+        Gateway(embedder=_IntentEmbedder(), tau=0.5, llm=fake_llm),
         "G-B-sem",
         [case for case in cases if case["attack_type"] == "hidden_html_comment"],
     )
@@ -122,7 +125,7 @@ def test_adaptive_loader_and_evaluator_report_execution_by_attack_type(tmp_path)
 
     adaptive_report = evaluate_adaptive(
         [case for case in cases if case["attack_type"] == "task_framed"],
-        tau=0.5, seed=3, embedder=_IntentEmbedder(),
+        tau=0.5, seed=3, embedder=_IntentEmbedder(), llm=fake_llm,
     )
     assert adaptive_report["mode_order"] == PAPER_MODES
     type_report = adaptive_report["by_attack_type"]["task_framed"]
@@ -132,7 +135,7 @@ def test_adaptive_loader_and_evaluator_report_execution_by_attack_type(tmp_path)
     assert "G-B" in type_report["stage_b_accepting_modes"]
 
     hidden_html = [case for case in cases if case["attack_type"] == "hidden_html_comment"]
-    hidden_report = evaluate_adaptive(hidden_html, tau=0.5, seed=3, embedder=_IntentEmbedder())
+    hidden_report = evaluate_adaptive(hidden_html, tau=0.5, seed=3, embedder=_IntentEmbedder(), llm=fake_llm)
     hidden_type = hidden_report["by_attack_type"]["hidden_html_comment"]["modes"]
     assert hidden_type["G-B-sem"]["attack_success"] == 1.0
     assert hidden_type["G-B-sem"]["case_outcomes"][0]["stopped_by"] == ["not_stopped"]

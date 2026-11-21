@@ -1296,5 +1296,11 @@
       "test_detection": 0.8889,
       "test_false_block": 0.1429
     }
-  ]
+  ],
+  "model": "llama3.2",
+  "temperature": 0.7,
+  "seed": 42,
+  "tau": 0.13,
+  "embedder": "all-MiniLM-L6-v2",
+  "N": 20
 }

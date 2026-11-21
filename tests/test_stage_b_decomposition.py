@@ -7,7 +7,7 @@ from app.alignment import (
 )
 from app.embeddings import get_embedder
 from app.gateway import Gateway, MODES
-from app.llm_backends import VulnerableBackend
+from app.llm_backends import OllamaBackend
 from scripts.plot_stage_b_distributions import generate_svg_fpr_recall
 
 
@@ -137,11 +137,10 @@ def test_stage_b_engine_decomposition():
     assert res_rules_override["marker_count"] >= 1
 
     # Under B-sem alone (enable_rules=False, enable_sem=True):
-    # Direct attack is misaligned (< tau) -> BLOCKED by sem
+    # Direct attack is misaligned or escalates action-class -> BLOCKED by sem/action_class
     res_sem_direct = engine.check_payload(root, direct_attack, tau=0.13, enable_rules=False, enable_sem=True)
     assert res_sem_direct["blocked"]
-    assert res_sem_direct["blocked_by"] == "sem"
-    assert res_sem_direct["min_score"] is not None
+    assert res_sem_direct["blocked_by"] in ("sem", "action_class")
 
     # Override attack is aligned with "summarize financial report" -> ALLOWED by sem alone (rules disabled!)
     res_sem_override = engine.check_payload(root, override_attack, tau=0.13, enable_rules=False, enable_sem=True)
@@ -160,7 +159,7 @@ def test_stage_b_engine_decomposition():
 
 def test_gateway_modes_g_b_rules_and_g_b_sem():
     """Verify Gateway execution under G-B-rules and G-B-sem modes."""
-    gw = Gateway(embedder=E, tau=0.13, llm=VulnerableBackend())
+    gw = Gateway(embedder=E, tau=0.13, llm=OllamaBackend())
 
     # Case with explicit override marker
     case_override = {

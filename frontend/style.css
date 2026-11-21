@@ -41,6 +41,9 @@ textarea{resize:vertical}.mono{font-family:var(--mono);font-size:.82rem}
 input[type=range]{width:100%;accent-color:var(--trust)}
 .hint{font-size:.8rem;color:var(--muted);font-weight:400}
 .row{display:flex;gap:.6rem;margin-top:.9rem}.row.wrap{flex-wrap:wrap;align-items:flex-end}
+.row.align-center{align-items:center}
+.wrap-tau{display:flex;gap:.5rem;align-items:center;margin-top:.4rem}
+button.sm{padding:.25rem .55rem;font-size:.78rem;white-space:nowrap;line-height:1.2;align-self:flex-end;margin-bottom:.2rem}
 .row label{margin:0}
 button{font:inherit;padding:.55rem .9rem;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
 button:hover{border-color:var(--trust)}

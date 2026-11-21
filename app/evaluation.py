@@ -213,7 +213,7 @@ def evaluate_plan_gating_utility(
                 for case, result in runs
             ],
         })
-    return {"workload": "dynamic_tool_use", "rows": rows}
+    return {"workload": "in-house AgentDojo-style dynamic set", "rows": rows}
 
 
 def evaluate_planner_reliability(planner, cases: list[dict]) -> dict:
@@ -258,11 +258,14 @@ def evaluate_planner_reliability(planner, cases: list[dict]) -> dict:
     }
 
 
-def evaluate(modes: list[str] | None = None, tau: float | None = None, split: str = "all",
+PRIMARY_EVAL_MODES = ["B0", "G-A", "G-B", "G-AB", "FULL"]
+
+def evaluate(modes: list[str] | None = None, tau: float | None = None, split: str = "sample",
              repeats: int = 1, embedder=None) -> dict:
     gw = Gateway(embedder=embedder, tau=tau)
     cases = split_cases(split)
-    rows = [evaluate_mode(gw, m, cases, repeats) for m in (modes or list(MODES))]
+    target_modes = modes or PRIMARY_EVAL_MODES
+    rows = [evaluate_mode(gw, m, cases, repeats) for m in target_modes]
     return {"tau": gw.tau, "embedder": gw.embedder.name, "split": split, "repeats": repeats, "rows": rows}
 
 

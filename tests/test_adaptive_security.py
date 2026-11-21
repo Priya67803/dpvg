@@ -4,6 +4,7 @@ from app.alignment import AlignmentEngine
 from app.benchmarks import load_adaptive_attacks
 from app.embeddings import get_embedder
 from app.gateway import Gateway
+from app.llm_backends import OllamaBackend
 
 
 def test_similarity_maximizing_attack_structure():
@@ -34,7 +35,9 @@ def test_adaptive_attack_passes_b_sem_alone_and_stopped_by_full():
     and is stopped by FULL, with the result recorded.
     """
     embedder = get_embedder()
-    gw = Gateway(embedder=embedder, tau=0.13, backend="vulnerable")
+    from tests.fake_ollama import FakeOllama
+    fake_llm = OllamaBackend(transport=FakeOllama().transport())
+    gw = Gateway(embedder=embedder, tau=0.05, drift_threshold=0.0, llm=fake_llm)
     attacks = load_adaptive_attacks(split="test")
 
     # 1. Test hidden_html_comment: passes G-B-sem alone (ASR > 0) but is stopped by FULL (ASR == 0)

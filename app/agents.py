@@ -45,19 +45,15 @@ AGENTS = {
 
 
 def get_llm(backend: str | None = None, **kw):
-    """Construct the explicitly selected backend; unknown names fail rather than falling back."""
+    """Construct the backend (Ollama llama3.2 or scripted compromised follower)."""
     from . import config
-    from .llm_backends import OllamaBackend
+    from .llm_backends import OllamaBackend, CompromisedBackend
     name = (backend or config.BACKEND).lower()
     if name == "ollama":
         return OllamaBackend(**kw)
-    if name == "vulnerable":
-        from .llm_backends import VulnerableBackend
-        return VulnerableBackend(**kw)
-    if name == "hosted":
-        from .llm_backends import HostedAPIBackend
-        return HostedAPIBackend(**kw)
-    raise ValueError(f"unknown backend '{name}' (ollama | vulnerable | hosted)")
+    if name in ("compromised", "scripted"):
+        return CompromisedBackend(**kw)
+    raise ValueError(f"Backend '{name}' is not supported. Supported: 'ollama', 'compromised'.")
 
 
 def get_role_backend(role: str, **kw):

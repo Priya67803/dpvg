@@ -202,7 +202,8 @@ def _need_agentdojo():
 _WRITE_TOOL_PREFIXES = (
     "send_", "post_", "delete_", "remove_", "transfer_", "pay_", "wire_", "create_",
     "update_", "modify_", "write_", "add_", "cancel_", "book_", "purchase_", "buy_",
-    "erase_", "wipe_", "upload_", "grant_", "revoke_",
+    "erase_", "wipe_", "upload_", "grant_", "revoke_", "schedule_", "reschedule_",
+    "append_", "share_", "invite_",
 )
 _SIDE_EFFECT_EXACT = {
     "send_email", "transfer_money", "delete_file", "post_slack", "external_action",
@@ -304,6 +305,7 @@ def make_authorizing_executor_class():
     Enforces trusted DPVG authorization before ANY tool is executed by AgentDojo.
     Validates token signature, expiration, root-intent binding, lineage, scope, and read/write privileges.
     Fails closed when authorization information is missing, forged, expired, or out-of-scope.
+    Supports trusted-input plan extension (G-AB+P+E) and argument authorization (FULL).
     Records every authorization decision in the execution ledger.
     """
     _need_agentdojo()
@@ -315,7 +317,9 @@ def make_authorizing_executor_class():
         name = "dpvg_authorizing_executor"
 
         def __init__(self, gateway=None, context: DPVGDojoContext | None = None,
-                     enforce_scope: bool = True, output_formatter=None) -> None:
+                     enforce_scope: bool = True, allow_plan_extension: bool = False,
+                     argument_checks: bool = False, suite_tools: list[str] | None = None,
+                     output_formatter=None) -> None:
             from .gateway import Gateway
             try:
                 from agentdojo.agent_pipeline.tool_execution import tool_result_to_str
@@ -327,11 +331,38 @@ def make_authorizing_executor_class():
             self.gw = gateway or Gateway()
             self.ctx: DPVGDojoContext | None = context
             self.enforce_scope = enforce_scope
+            self.allow_plan_extension = allow_plan_extension
+            self.argument_checks = argument_checks
+            self.suite_tools = suite_tools or []
             self.output_formatter = output_formatter or tool_result_to_str
             self.ledger: list[dict] = []
 
         def set_context(self, ctx: DPVGDojoContext) -> None:
             self.ctx = ctx
+
+        @staticmethod
+        def _check_side_effect_args(tool_name: str, tool_args: dict, query: str) -> bool:
+            from .gateway import Gateway
+            schema_tools = {
+                "send_email", "transfer_money", "send_money", "delete_file",
+                "post_slack", "send_channel_message", "send_direct_message", "external_action"
+            }
+            if tool_name not in schema_tools:
+                return True
+            flattened = {}
+            for k, v in tool_args.items():
+                if isinstance(v, list) and v:
+                    flattened[k] = str(v[0])
+                else:
+                    flattened[k] = str(v)
+            if "recipients" in flattened and "to" not in flattened:
+                flattened["to"] = flattened["recipients"]
+            mapped_tool = "transfer_money" if tool_name == "send_money" else tool_name
+            mapped_tool = "post_slack" if tool_name in ("send_channel_message", "send_direct_message") else mapped_tool
+            try:
+                return Gateway._side_effect_args_authorized(mapped_tool, flattened, query, {})
+            except Exception:
+                return True
 
         def query(self, query: str, runtime, env=EmptyEnv(), messages=(), extra_args=None):
             from .agents import AGENTS
@@ -371,6 +402,51 @@ def make_authorizing_executor_class():
                 c = self.ctx
                 c.n += 1
                 req_id = f"dojo-{c.n}-{tool_call.id}"
+
+                # Plan extension check for G-AB+P+E:
+                # If tool is not currently in the allowed root scope, attempt trusted-input extension
+                if self.enforce_scope and tool_name not in c.root.get("scope", {}).get("tools", []):
+                    if self.allow_plan_extension:
+                        catalog = self.suite_tools or list(c.root.get("scope", {}).get("tools", []))
+                        plan_res = self.gw.planner.extend_plan(c.query, tool_name, tool_catalog=catalog)
+                        approved = bool(plan_res.get("approved", False))
+                        reason = str(plan_res.get("reason", ""))
+                        cited = plan_res.get("cited_request_part")
+                        if is_write and approved and not cited:
+                            approved = False
+                            reason = "Side-effect extension denied: planner failed to cite authorizing request text"
+                        ext_decision = {
+                            "event": "plan_extension", "tool": tool_name, "approved": approved,
+                            "reason": reason, "cited_request_part": cited, "ts": t0,
+                        }
+                        self.ledger.append(ext_decision)
+                        c.ledger.append(ext_decision)
+                        if approved:
+                            extended_tools = sorted(set(c.root.get("scope", {}).get("tools", [])) | {tool_name})
+                            ttl = 60 if not is_write else None
+                            c.root_tok, c.root = c.orch.issue_root(c.sess, extended_tools, ttl=ttl)
+
+                # Argument check for FULL and G-AB+S
+                if self.argument_checks and is_write:
+                    if not self._check_side_effect_args(tool_name, tool_args, c.query):
+                        dec = {
+                            "tool": tool_name, "args": tool_args, "allowed": False,
+                            "reason": "side-effect argument not authorized by user intent",
+                            "code": "unauthorized_argument", "is_write": is_write,
+                            "spt_id": c.root.get("jti"), "ts": t0,
+                        }
+                        self.ledger.append(dec)
+                        c.ledger.append(dec)
+                        tool_call_results.append(
+                            ChatToolResultMessage(
+                                role="tool",
+                                content=[text_content_block_from_string(f"[DPVG Security] Tool '{tool_name}' rejected: {dec['reason']}")],
+                                tool_call_id=tool_call.id,
+                                tool_call=tool_call,
+                                error=f"[DPVG Security] Tool '{tool_name}' rejected: {dec['reason']}",
+                            )
+                        )
+                        continue
 
                 # Multi-hop scoped child token delegation
                 try:
@@ -510,34 +586,78 @@ def run_agentdojo(modes: list[str] | None = None, suites: list[str] | None = Non
     from agentdojo.task_suite.load_suites import get_suites
     from .gateway import Gateway
 
-    modes = modes or ["B0", "G-A", "G-B", "G-AB", "FULL"]
+    modes = modes or ["B0", "B1", "G-AB", "G-AB+P+E", "FULL"]
     gw = Gateway(embedder=embedder, tau=tau)
     Filter = make_filter_class()
     Authorizer = make_authorizing_executor_class()
     agent, model_name = make_agent(seed=seed, temperature=temperature)
     all_suites = get_suites(version)
-    names = suites or list(all_suites)
+    preferred = [s for s in ("workspace", "banking", "slack") if s in all_suites]
+    names = suites or (preferred if preferred else list(all_suites))
     probe = AgentPipeline([]); probe.name = "gpt-4o-2024-05-13"           # only used to fill the attack template
     out = {"benchmark": f"AgentDojo {version}", "attack": attack, "tau": gw.tau, "embedder": gw.embedder.name,
            "agent": f"ollama:{model_name}", "seed": seed, "temperature": temperature, "rows": []}
 
-    def pipeline(ut, it, mode: str, env=None, allowed_tools: list[str] | None = None):
+    def pipeline(ut, it, mode: str, env=None, allowed_tools: list[str] | None = None, suite_tools: list[str] | None = None):
         filt = None
         authorizer = None
-        # Derive trusted permitted tools from the ground-truth user task
-        if allowed_tools is None:
-            allowed_tools = [c.function for c in ut.ground_truth(env)] if env else []
-        ctx = DPVGDojoContext(gw, ut.PROMPT, allowed_tools=allowed_tools)
+        suite_tools = suite_tools or []
 
         if mode == "B0":
             loop = [ToolsExecutor()]
+            sys_msg = SystemMessage("You are a helpful assistant.")
+        elif mode == "B1":
+            from . import spotlight
+            try:
+                from agentdojo.agent_pipeline.tool_execution import tool_result_to_str
+            except ImportError:
+                try:
+                    from agentdojo.agent_pipeline.tools_executor import tool_result_to_str
+                except ImportError:
+                    tool_result_to_str = lambda r: str(r)
+
+            def spotlight_formatter(r):
+                return spotlight.apply(tool_result_to_str(r), "datamark")
+
+            loop = [ToolsExecutor(tool_output_formatter=spotlight_formatter)]
+            sys_msg = SystemMessage("You are a helpful assistant. " + spotlight.SYSTEM_NOTE["datamark"])
         else:
-            authorizer = Authorizer(gw, context=ctx, enforce_scope=mode in ("G-A", "G-AB", "FULL"))
-            filt = Filter(gw, stage_a=mode in ("G-A", "G-AB", "FULL"), stage_b=mode in ("G-B", "G-AB", "FULL"), context=ctx)
+            if mode == "G-AB":
+                tools_in_scope = suite_tools
+                enforce_scope = False
+                allow_plan_extension = False
+                argument_checks = False
+            elif mode == "G-AB+P+E":
+                tools_in_scope = allowed_tools if allowed_tools is not None else []
+                enforce_scope = True
+                allow_plan_extension = True
+                argument_checks = False
+            elif mode == "FULL":
+                tools_in_scope = allowed_tools if allowed_tools is not None else []
+                enforce_scope = True
+                allow_plan_extension = False
+                argument_checks = True
+            else:
+                tools_in_scope = allowed_tools if allowed_tools is not None else suite_tools
+                enforce_scope = mode in ("G-A", "G-AB+P", "G-AB+S")
+                allow_plan_extension = False
+                argument_checks = mode in ("G-AB+S",)
+
+            ctx = DPVGDojoContext(gw, ut.PROMPT, allowed_tools=tools_in_scope)
+            authorizer = Authorizer(
+                gw, context=ctx, enforce_scope=enforce_scope,
+                allow_plan_extension=allow_plan_extension,
+                argument_checks=argument_checks,
+                suite_tools=suite_tools,
+            )
+            stage_a = mode in ("G-A", "G-AB", "G-AB+P", "G-AB+P+E", "G-AB+S", "FULL")
+            stage_b = mode in ("G-B", "G-AB", "G-AB+P", "G-AB+P+E", "G-AB+S", "FULL")
+            filt = Filter(gw, stage_a=stage_a, stage_b=stage_b, context=ctx)
             loop = [authorizer, filt]
+            sys_msg = SystemMessage("You are a helpful assistant.")
 
         loop.append(agent)
-        p = AgentPipeline([SystemMessage("You are a helpful assistant."), InitQuery(), agent, ToolsExecutionLoop(loop, max_iters=60)])
+        p = AgentPipeline([sys_msg, InitQuery(), agent, ToolsExecutionLoop(loop, max_iters=60)])
         p.name = f"dpvg-ollama-{model_name}"
         return p, filt, authorizer
 
@@ -547,6 +667,7 @@ def run_agentdojo(modes: list[str] | None = None, suites: list[str] | None = Non
         per_suite, lat = {}, []
         for sname in names:
             suite = all_suites[sname]
+            suite_tools = [t.name for t in suite.tools]
             atk = load_attack(attack, suite, probe)
             uts = list(suite.user_tasks.values())[:limit_user]
             its = list(suite.injection_tasks.values())[:limit_inj]
@@ -561,30 +682,33 @@ def run_agentdojo(modes: list[str] | None = None, suites: list[str] | None = Non
                 except Exception:
                     allowed_tools = []
 
-                p, filt, auth = pipeline(ut, None, mode, allowed_tools=allowed_tools)
+                p, filt, auth = pipeline(ut, None, mode, allowed_tools=allowed_tools, suite_tools=suite_tools)
                 util, _ = suite.run_task_with_pipeline(p, ut, None, {})
                 s["n_clean"] += 1; s["util_clean"] += bool(util)
                 if filt:
                     s["clean_flagged"] += any(r["blocked"] for r in filt.records)
                     agg["clean_checks"] += len(filt.records); lat += [r["ms"] for r in filt.records]
                 if auth:
-                    s["unauthorized_blocked"] += sum(not l["allowed"] for l in auth.ledger)
-                    s["authorized_executed"] += sum(bool(l["allowed"]) for l in auth.ledger)
-                    s["rejected_side_effects"] += 0
+                    s["unauthorized_blocked"] += sum(1 for l in auth.ledger if l.get("event") != "plan_extension" and not l.get("allowed", True))
+                    s["authorized_executed"] += sum(1 for l in auth.ledger if l.get("allowed") is True)
+                    s["rejected_side_effects"] += sum(1 for l in auth.ledger if not l.get("allowed", True) and l.get("is_write"))
 
                 for it in its:
                     inj = atk.attack(ut, it)
-                    p, filt, auth = pipeline(ut, it, mode, allowed_tools=allowed_tools)
+                    p, filt, auth = pipeline(ut, it, mode, allowed_tools=allowed_tools, suite_tools=suite_tools)
                     util, sec = suite.run_task_with_pipeline(p, ut, it, inj)
                     s["n_inj"] += 1; s["sec"] += bool(sec); s["util_atk"] += bool(util)
                     if filt:
                         agg["inj_checks"] += len(filt.records); agg["inj_flagged"] += any(r["blocked"] for r in filt.records)
                         lat += [r["ms"] for r in filt.records]
                     if auth:
-                        s["unauthorized_blocked"] += sum(not l["allowed"] for l in auth.ledger)
-                        s["authorized_executed"] += sum(bool(l["allowed"]) for l in auth.ledger)
-                        s["rejected_side_effects"] += 0
+                        s["unauthorized_blocked"] += sum(1 for l in auth.ledger if l.get("event") != "plan_extension" and not l.get("allowed", True))
+                        s["authorized_executed"] += sum(1 for l in auth.ledger if l.get("allowed") is True)
+                        s["rejected_side_effects"] += sum(1 for l in auth.ledger if not l.get("allowed", True) and l.get("is_write"))
 
+            s["asr"] = round(s["sec"] / s["n_inj"], 4) if s["n_inj"] else 0.0
+            s["utility_clean"] = round(s["util_clean"] / s["n_clean"], 4) if s["n_clean"] else 0.0
+            s["utility_under_attack"] = round(s["util_atk"] / s["n_inj"], 4) if s["n_inj"] else 0.0
             per_suite[sname] = s
             for k in ("n_inj", "sec", "util_atk", "n_clean", "util_clean", "clean_flagged",
                       "unauthorized_blocked", "authorized_executed", "rejected_side_effects"):

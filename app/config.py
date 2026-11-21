@@ -31,7 +31,7 @@ MAX_REPLANS = int(os.getenv("DPVG_MAX_REPLANS", "1"))
 STRICT_MODE = os.getenv("DPVG_STRICT_MODE", "false").lower() in ("true", "1", "yes")
 _LLM_SEED = os.getenv("DPVG_LLM_SEED")
 LLM_SEED = int(_LLM_SEED) if _LLM_SEED else None
-LLM_TEMPERATURE = float(os.getenv("DPVG_LLM_TEMPERATURE", "0"))
+LLM_TEMPERATURE = float(os.getenv("DPVG_LLM_TEMPERATURE", "0.7"))
 ISSUER = "dpvg-control-plane"
 EMBEDDER = os.getenv("DPVG_EMBEDDER", "onnx")         # onnx (bundled MiniLM) | st (sentence-transformers); no fallback
 MODEL_DIR = os.getenv("DPVG_MODEL_DIR", str(__import__("pathlib").Path(__file__).resolve().parent.parent / "models" / "all-MiniLM-L6-v2"))
@@ -40,9 +40,9 @@ CALIBRATION_FILE = _CALIBRATION_PATH
 PAPER_TAU = 0.45                                      # paper default for MiniLM
 
 # ---- Tool classification
-READ_ONLY_TOOLS: set[str] = {"read_email", "get_calendar", "read_file", "search_web"}
-SIDE_EFFECT_TOOLS: set[str] = {"send_email", "transfer_money", "delete_file", "post_slack", "external_action"}
-ALL_CATALOG_TOOLS: list[str] = ["read_email", "get_calendar", "read_file", "search_web", "send_email", "transfer_money", "delete_file", "post_slack", "external_action"]
+READ_ONLY_TOOLS: set[str] = {"read_email", "get_calendar", "read_file", "search_web", "fetch_url"}
+SIDE_EFFECT_TOOLS: set[str] = {"send_email", "transfer_money", "delete_file", "delete_calendar_events", "post_slack", "external_action"}
+ALL_CATALOG_TOOLS: list[str] = ["read_email", "get_calendar", "read_file", "search_web", "fetch_url", "send_email", "transfer_money", "delete_file", "delete_calendar_events", "post_slack", "external_action"]
 PLAN_EXTENSION_READ_ONLY_TTL: int = int(os.getenv("DPVG_PLAN_EXTENSION_READ_ONLY_TTL", "60"))
 
 # ---- Stage B override patterns (rule-based filter)
@@ -62,10 +62,14 @@ OVERRIDE_PATTERNS: tuple[str, ...] = (
     r"\byour\s+(?:new\s+)?task\s+is\s+to\b",
     # Pattern 6: User secrecy directives
     r"\bdo\s+not\s+(?:tell|inform|mention\s+to)\s+(?:the\s+)?user\b",
+    # Pattern 7: Directive spans addressed to downstream agent / model
+    r"\b(?:message|note|instruction)s?\s+(?:to|for)\s+(?:the\s+)?(?:downstream\s+|next\s+)?(?:agent|assistant|model)\b",
+    # Pattern 8: Priority headers
+    r"^\s*(?:important|urgent|system|admin)\s*[:\-]",
 )
 
 # ---- agent backends and roles
-BACKEND = os.getenv("DPVG_BACKEND", "ollama").lower()       # ollama | vulnerable | hosted
+BACKEND = os.getenv("DPVG_BACKEND", "ollama").strip().lower()       # ollama only
 BACKEND_PLANNER = os.getenv("DPVG_BACKEND_PLANNER", BACKEND).lower()
 BACKEND_TOOL = os.getenv("DPVG_BACKEND_TOOL", BACKEND).lower()
 BACKEND_REASONING = os.getenv("DPVG_BACKEND_REASONING", BACKEND).lower()

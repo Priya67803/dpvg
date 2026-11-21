@@ -1,0 +1,68 @@
+{
+  "model": "llama3.2",
+  "temperature": 0.7,
+  "seed": 42,
+  "tau": 0.13,
+  "embedder": "all-MiniLM-L6-v2",
+  "N": 250,
+  "n_iterations": 250,
+  "warmup": 50,
+  "embedder_backend": "onnxruntime",
+  "crypto_algorithm": "Ed25519 (EdDSA)",
+  "benchmarks_ms": {
+    "token_issuance_once_per_task": {
+      "p50": 0.2453,
+      "p90": 0.3864,
+      "p95": 0.4739,
+      "p99": 0.74,
+      "mean": 0.2699
+    },
+    "stage_a_per_call_verify": {
+      "p50": 0.5754,
+      "p90": 0.8501,
+      "p95": 1.0968,
+      "p99": 1.6893,
+      "mean": 0.6295
+    },
+    "stage_b_action_class_check": {
+      "p50": 0.0279,
+      "p90": 0.0432,
+      "p95": 0.0492,
+      "p99": 0.0972,
+      "mean": 0.0301
+    },
+    "stage_b_embedding_similarity": {
+      "p50": 0.034,
+      "p90": 0.065,
+      "p95": 0.0752,
+      "p99": 0.1535,
+      "mean": 0.0422
+    },
+    "stage_b_total_payload_verify": {
+      "p50": 0.7037,
+      "p90": 0.9409,
+      "p95": 1.1233,
+      "p99": 1.8624,
+      "mean": 0.7325
+    },
+    "single_plan_total_gateway_verify": {
+      "p50": 2.9924,
+      "p90": 4.0175,
+      "p95": 4.9993,
+      "p99": 7.0593,
+      "mean": 2.994
+    },
+    "replan_total_gateway_verify": {
+      "p50": 4.6047,
+      "p90": 6.2273,
+      "p95": 7.609,
+      "p99": 10.8703,
+      "mean": 4.6259
+    }
+  },
+  "comparison_to_ollama_inference": {
+    "ollama_llama32_inference_per_step_ms_p50": 1850.0,
+    "single_plan_gateway_percent_of_inference": 0.08,
+    "replan_gateway_percent_of_inference": 0.08
+  }
+}

@@ -134,7 +134,7 @@ from `results/` in this repository; no numbers are placeholder or fabricated.
 > with a short TTL (60s); approved side-effect tools require the planner to cite the specific phrase in the user
 > request that authorizes the tool, followed by standard argument checks and an optional human-approval hook.
 >
-> Evaluated on the expanded 54-case dynamic-tool benchmark (`data/dynamic_tool_use.json`: 24 read-only lookups,
+> Evaluated on the in-house AgentDojo-style dynamic set (`data/dynamic_tool_use.json`, not official AgentDojo: 24 read-only lookups,
 > 15 authorized side-effects, 15 attack injections):
 >
 > | Configuration | Dynamic Utility TCR | ASR | Approved Extensions | Attack Injections Admitted |

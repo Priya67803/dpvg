@@ -90,7 +90,9 @@ class RulePlanner:
             return {"approved": False, "reason": f"Tool '{proposed_tool}' is not in catalog", "cited_request_part": None}
 
         from .dataplane import is_read_only, is_side_effect
-        if is_read_only(proposed_tool):
+        from .benchmarks import is_write_tool
+        read_tool = is_read_only(proposed_tool) or (not is_side_effect(proposed_tool) and not is_write_tool(proposed_tool))
+        if read_tool:
             q_lower = str(trusted_query).lower()
             if proposed_tool == "search_web":
                 if re.search(r"\b(verify|verification|check|crosscheck|cross-check|citation|source|reference|search|look\s*up|find|confirm|report|policy|article|news|online|index)\b", q_lower):
@@ -98,14 +100,14 @@ class RulePlanner:
             elif proposed_tool in ("read_file", "read_email", "get_calendar"):
                 if re.search(r"\b(read|file|doc|report|notes|pdf|email|mail|inbox|calendar|meeting|schedule|event)\b", q_lower):
                     return {"approved": True, "reason": f"Read-only tool '{proposed_tool}' approved to support user task", "cited_request_part": None}
-            if re.search(r"\b(verify|check|find|get|show|read|search|inspect)\b", q_lower):
+            if re.search(r"\b(verify|check|find|get|show|read|search|inspect|lookup|who|when|where|what|which|how|tell|give|list|summarize|summary|status|details|count|appointments?|events?|meetings?|calendar|emails?|inbox|messages?|files?|documents?|balance|transactions?|iban|channels?)\b", q_lower):
                 return {"approved": True, "reason": f"Read-only tool '{proposed_tool}' approved for user request", "cited_request_part": None}
             return {"approved": False, "reason": f"Read-only tool '{proposed_tool}' not related to user request", "cited_request_part": None}
 
-        if is_side_effect(proposed_tool):
+        if is_side_effect(proposed_tool) or is_write_tool(proposed_tool):
             q_str = str(trusted_query)
             if proposed_tool == "send_email":
-                m = re.search(r"\b(?:email|mail|send(?:\s+the\s+[\w\s]+)?\s+to|forward(?:\s+to)?|notify)\b[^\n.,;]*", q_str, re.I)
+                m = re.search(r"\b(?:(?:email|send|mail|forward)(?:\s+(?:an?\s+|the\s+)?[\w\s]+?)?\s+to\b|email\s+[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-.]+|notify\b)[^\n.,;]*", q_str, re.I)
                 if m:
                     cite = m.group(0).strip()
                     return {"approved": True, "reason": f"Side-effect tool authorized by: {cite}", "cited_request_part": cite}
@@ -312,15 +314,27 @@ class Orchestrator:
         return AGENTS["specialized"] if st.tool in {"transfer_money", "send_email", "post_slack", "delete_file"} else AGENTS["tool"]
 
     def issue_root(self, session, tools: list[str], agents: list[str] | None = None,
-                   read_only: bool = False, max_depth: int | None = None, ttl: int | None = None) -> tuple[str, dict]:
-        from .spt import root_lineage
-        lin = root_lineage(session.root_hash)
+                   read_only: bool = False, permissions: dict | None = None,
+                   max_depth: int | None = None, ttl: int | None = None,
+                   replan_of: str | None = None, replan_nonce: str | None = None) -> tuple[str, dict]:
+        from .spt import root_lineage, replan_root_lineage
+        if replan_of:
+            import uuid
+            nonce = replan_nonce or uuid.uuid4().hex[:12]
+            lin = replan_root_lineage(session.root_hash, replan_of, nonce)
+        else:
+            lin = root_lineage(session.root_hash)
         effective_depth = max_depth if max_depth is not None else self.max_depth
         allowed_agents = agents if agents is not None else [a.id for a in AGENTS.values()]
+        effective_permissions = permissions if permissions is not None else (
+            {"read": True, "write": False} if read_only else {"read": True, "write": True}
+        )
         token, claims = self.spt.issue(root_hash=session.root_hash, lineage=lin, tools=tools,
                                        agents=allowed_agents, depth=0,
                                        agent=AGENTS["planner"].id, max_depth=effective_depth,
-                                       session_id=session.id, read_only=read_only, ttl=ttl)
+                                       session_id=session.id, read_only=read_only,
+                                       permissions=effective_permissions, ttl=ttl,
+                                       replan_of=replan_of)
         self.registry.lineage[claims["jti"]] = LineageRecord(
             lineage=lin, parent=None, depth=0, agent=claims["agent"],
             tools=sorted(set(tools)), agents=sorted(set(allowed_agents)),
@@ -332,6 +346,7 @@ class Orchestrator:
                  requested_tools: list[str] | None = None,
                  requested_agents: list[str] | None = None,
                  read_only: bool | None = None,
+                 permissions: dict | None = None,
                  lineage_parent: dict | None = None) -> tuple[str, dict]:
         """Delegate to a child agent with strict multi-hop scope attenuation.
         Invariant: S(child) ⊆ S(parent).
@@ -403,6 +418,11 @@ class Orchestrator:
 
         # Read-only attenuation: if parent is read-only, child must strictly be read-only
         child_read_only = parent_read_only or bool(read_only)
+        parent_perms = parent.get("scope", {}).get("permissions", {})
+        if child_read_only:
+            child_permissions = permissions or {"read": True, "write": False}
+        else:
+            child_permissions = permissions or parent_perms or {"read": True, "write": True}
 
         # Audit lineage follows executed hops independently of the scope-parent relationship.
         hop = f"{agent.id}:{st.idx}:{st.tool}"
@@ -419,6 +439,7 @@ class Orchestrator:
             max_depth=effective_max_depth,
             session_id=session.id,
             read_only=child_read_only,
+            permissions=child_permissions,
             lineage_parent_jti=lineage_parent_jti,
             lineage_hop=hop,
         )

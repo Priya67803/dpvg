@@ -1,7 +1,7 @@
 import pytest
 from app.embeddings import get_embedder
 from app.gateway import Gateway, RuntimeBlockException
-from app.llm_backends import VulnerableBackend
+from app.llm_backends import OllamaBackend
 from app.dataset import CASES
 from scripts.calibrate_drift import select_drift_parameters
 
@@ -51,7 +51,7 @@ def test_drift_triggers_on_diverging_trajectory_ema():
     # Step 2: movies -> low similarity (~0.03) -> EMA=0.26 < 0.35 -> allowed (consecutive_below = 1 < 2)
     # Step 3: gardening -> low similarity (~0.05) -> EMA=0.15 < 0.35 -> BLOCKED (consecutive_below = 2 >= 2)
     gw = Gateway(
-        embedder=E, tau=0.45, llm=VulnerableBackend(), max_replans=0, drift_threshold=0.35,
+        embedder=E, tau=0.45, llm=OllamaBackend(), max_replans=0, drift_threshold=0.35,
         drift_consecutive_steps=2, drift_ema_alpha=0.5, drift_metric="ema",
     )
     res = gw.run(case, "FULL")
@@ -109,7 +109,7 @@ def test_drift_triggers_on_diverging_trajectory_running_mean():
     }
 
     gw = Gateway(
-        embedder=E, tau=0.45, llm=VulnerableBackend(), max_replans=0, drift_threshold=0.35,
+        embedder=E, tau=0.45, llm=OllamaBackend(), max_replans=0, drift_threshold=0.35,
         drift_consecutive_steps=2, drift_metric="mean",
     )
     res = gw.run(case, "FULL")
